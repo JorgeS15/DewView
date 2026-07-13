@@ -22,8 +22,24 @@
  */
 #define DEWVIEW_MODBUS_MODE DEWVIEW_MODBUS_TCP
 
+/*========================= Access Point + OTA =============================*/
+
+/**
+ * A placa cria sempre esta rede WiFi ao arrancar. Liga-te a ela para ver o
+ * estado (http://192.168.4.1 ou http://dewview.local) e atualizar o firmware
+ * (http://192.168.4.1/update, ou porta de rede do Arduino IDE).
+ */
+#define DEWVIEW_AP_SSID         "DewView"
+#define DEWVIEW_AP_PASSWORD     "Orvalho88"
+#define DEWVIEW_HOSTNAME        "dewview"
+
+/* Credenciais pedidas pela pagina /update e pelo OTA do Arduino IDE */
+#define DEWVIEW_OTA_USER        "admin"
+#define DEWVIEW_OTA_PASSWORD    "Orvalho88"
+
 /*============================== WiFi (modo TCP) ===========================*/
 
+/* Rede existente onde esta o gateway Modbus TCP (so usado no modo TCP) */
 #define DEWVIEW_WIFI_SSID       "O_TEU_SSID"
 #define DEWVIEW_WIFI_PASSWORD   "A_TUA_PASSWORD"
 

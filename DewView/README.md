@@ -11,6 +11,26 @@ O ecrã apresenta:
 - Gráfico com o histórico das duas séries (~6 min com leituras a cada 3 s);
 - Barra de estado com a ligação WiFi/Modbus.
 
+## Rede e atualização de firmware (OTA)
+
+Ao arrancar, a placa cria sempre a rede WiFi **`DewView`** (password **`Orvalho88`**,
+configurável em `dewview_config.h`). Ligado a essa rede:
+
+- **http://192.168.4.1** (ou `http://dewview.local`) — página de estado com as
+  leituras atuais;
+- **http://192.168.4.1/update** — atualização de firmware pelo browser: pede
+  utilizador/password (`admin` / `Orvalho88`), escolhe o `.bin` exportado do
+  Arduino IDE (*Sketch → Export Compiled Binary*, usar o ficheiro
+  `*.ino.bin`) e submete. A placa reinicia sozinha no fim;
+- **Arduino IDE** — a placa também aparece como *network port* (ArduinoOTA,
+  password `Orvalho88`), para carregar diretamente do IDE sem cabo.
+
+No modo TCP a placa funciona em AP+STA: mantém o AP `DewView` e liga-se em
+simultâneo à rede do gateway Modbus.
+
+> **Nota:** o esquema de partições tem de ter duas partições de aplicação
+> (OTA). O recomendado abaixo — *16M Flash (3MB APP/9.9MB FATFS)* — serve.
+
 ## Modos de ligação ao sensor
 
 O S24 é um sensor **Modbus RTU sobre RS-485** nativo. Há duas formas de o ligar:
@@ -80,6 +100,7 @@ DewView/
 ├── DewView.ino                    # setup/loop: placa, LVGL, WiFi, ciclo de leitura
 ├── dewview_config.h               # configuração do utilizador
 ├── s24_modbus.{h,cpp}             # cliente Modbus TCP e RTU (função 0x03)
+├── dewview_net.{h,cpp}            # AP WiFi, página web de estado e OTA
 ├── dewview_ui.{h,cpp}             # dashboard LVGL
 ├── esp_panel_board_custom_conf.h  # configuração da placa (do exemplo 09)
 └── lvgl_v8_port.{h,cpp}           # porting LVGL (do exemplo 09)

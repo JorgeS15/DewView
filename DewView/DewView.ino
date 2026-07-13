@@ -16,10 +16,9 @@
 #include "dewview_config.h"
 #include "s24_modbus.h"
 #include "dewview_ui.h"
+#include "dewview_net.h"
 
-#if DEWVIEW_MODBUS_MODE == DEWVIEW_MODBUS_TCP
 #include <WiFi.h>
-#endif
 
 using namespace esp_panel::drivers;
 using namespace esp_panel::board;
@@ -58,12 +57,10 @@ void setup()
     dewview_ui_create();
     lvgl_port_unlock();
 
-#if DEWVIEW_MODBUS_MODE == DEWVIEW_MODBUS_TCP
-    Serial.printf("DewView: a ligar ao WiFi \"%s\"\n", DEWVIEW_WIFI_SSID);
-    WiFi.mode(WIFI_STA);
-    WiFi.setAutoReconnect(true);
-    WiFi.begin(DEWVIEW_WIFI_SSID, DEWVIEW_WIFI_PASSWORD);
+    /* AP "DewView" + servidor web + OTA (e STA para o gateway no modo TCP) */
+    dewview_net_begin();
 
+#if DEWVIEW_MODBUS_MODE == DEWVIEW_MODBUS_TCP
     lvgl_port_lock(-1);
     dewview_ui_set_status("A ligar WiFi...", false);
     lvgl_port_unlock();
@@ -74,24 +71,33 @@ void setup()
 
 void loop()
 {
+    dewview_net_loop();
+
+    /* Nao falar Modbus durante um upload de firmware */
+    if (dewview_net_ota_busy()) {
+        delay(10);
+        return;
+    }
+
 #if DEWVIEW_MODBUS_MODE == DEWVIEW_MODBUS_TCP
     if (WiFi.status() != WL_CONNECTED) {
         lvgl_port_lock(-1);
         dewview_ui_set_status("A ligar WiFi...", false);
         lvgl_port_unlock();
-        delay(250);
+        delay(100);
         return;
     }
 #endif
 
     if (millis() - s_last_poll < DEWVIEW_POLL_MS && s_last_poll != 0) {
-        delay(50);
+        delay(10);
         return;
     }
     s_last_poll = millis();
 
     S24Reading reading;
     const bool ok = s_sensor.read(reading);
+    dewview_net_set_reading(reading, ok);
 
     lvgl_port_lock(-1);
     if (ok) {
@@ -102,7 +108,9 @@ void loop()
         snprintf(status, sizeof(status), "Sensor OK  |  %s", WiFi.localIP().toString().c_str());
         dewview_ui_set_status(status, true);
 #else
-        dewview_ui_set_status("Sensor OK  |  RS485", true);
+        static char status[48];
+        snprintf(status, sizeof(status), "Sensor OK  |  AP %s", WiFi.softAPIP().toString().c_str());
+        dewview_ui_set_status(status, true);
 #endif
         Serial.printf("T=%.1fC  Td=%.1fC  HR=%.1f%%\n",
                       reading.tempC, reading.dewC, reading.humidity);
