@@ -17,6 +17,22 @@
 #define COL_WARN        lv_color_hex(0xc98500)
 #define COL_CRIT        lv_color_hex(0xe66767)
 
+/*
+ * Fontes: o lv_conf.h deste repositorio ativa as Montserrat 20 e 48 para os
+ * numeros grandes. Se estiveres a compilar com um lv_conf.h antigo (sem essas
+ * fontes), usa-se o melhor substituto disponivel para nao partir a compilacao.
+ */
+#if LV_FONT_MONTSERRAT_48
+#define DEW_FONT_VALUE  lv_font_montserrat_48
+#else
+#define DEW_FONT_VALUE  lv_font_montserrat_30
+#endif
+#if LV_FONT_MONTSERRAT_20
+#define DEW_FONT_UNIT   lv_font_montserrat_20
+#else
+#define DEW_FONT_UNIT   lv_font_montserrat_16
+#endif
+
 #define CHART_POINTS    120   // ~6 min de historico com poll de 3 s
 
 /* Valores no grafico em decimos de grau para manter resolucao de 0.1 degC */
@@ -85,13 +101,13 @@ static lv_obj_t *make_stat_tile(lv_obj_t *parent, const char *title, lv_color_t 
 
     lv_obj_t *value = lv_label_create(card);
     lv_label_set_text(value, "--");
-    lv_obj_set_style_text_font(value, &lv_font_montserrat_48, 0);
+    lv_obj_set_style_text_font(value, &DEW_FONT_VALUE, 0);
     lv_obj_set_style_text_color(value, COL_TEXT, 0);
     lv_obj_align(value, LV_ALIGN_BOTTOM_LEFT, 8, -18);
 
     lv_obj_t *unit_lbl = lv_label_create(card);
     lv_label_set_text(unit_lbl, unit);
-    lv_obj_set_style_text_font(unit_lbl, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_font(unit_lbl, &DEW_FONT_UNIT, 0);
     lv_obj_set_style_text_color(unit_lbl, COL_TEXT_MUTED, 0);
     lv_obj_align(unit_lbl, LV_ALIGN_BOTTOM_LEFT, 8, 4);
 
@@ -187,13 +203,13 @@ void dewview_ui_create()
 
     s_margin_value = lv_label_create(margin_card);
     lv_label_set_text(s_margin_value, "--");
-    lv_obj_set_style_text_font(s_margin_value, &lv_font_montserrat_48, 0);
+    lv_obj_set_style_text_font(s_margin_value, &DEW_FONT_VALUE, 0);
     lv_obj_set_style_text_color(s_margin_value, COL_TEXT, 0);
     lv_obj_align(s_margin_value, LV_ALIGN_BOTTOM_LEFT, 0, -18);
 
     lv_obj_t *munit = lv_label_create(margin_card);
     lv_label_set_text(munit, "°C");
-    lv_obj_set_style_text_font(munit, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_font(munit, &DEW_FONT_UNIT, 0);
     lv_obj_set_style_text_color(munit, COL_TEXT_MUTED, 0);
     lv_obj_align(munit, LV_ALIGN_BOTTOM_LEFT, 0, 4);
 
