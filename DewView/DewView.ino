@@ -28,7 +28,9 @@ static constexpr int STALE_AFTER_FAILURES = 3;
 
 static S24Modbus s_sensor;
 static uint32_t s_last_poll = 0;
-static int s_failures = 0;
+static int s_failures = 0;          // falhas consecutivas
+static uint32_t s_ok_count = 0;     // totais, para a pagina Sistema
+static uint32_t s_fail_count = 0;
 
 void setup()
 {
@@ -55,6 +57,7 @@ void setup()
 
     lvgl_port_lock(-1);
     dewview_ui_create();
+    dewview_ui_log("Arranque");
     lvgl_port_unlock();
 
     /* AP "DewView" + servidor web + OTA (e STA para o gateway no modo TCP) */
@@ -101,7 +104,11 @@ void loop()
 
     lvgl_port_lock(-1);
     if (ok) {
+        if (s_failures >= STALE_AFTER_FAILURES) {
+            dewview_ui_log("Sensor recuperado");
+        }
         s_failures = 0;
+        s_ok_count++;
         dewview_ui_update(reading);
 #if DEWVIEW_MODBUS_MODE == DEWVIEW_MODBUS_TCP
         static char status[48];
@@ -116,11 +123,16 @@ void loop()
                       reading.tempC, reading.dewC, reading.humidity);
     } else {
         s_failures++;
+        s_fail_count++;
         dewview_ui_set_status(s_sensor.lastError(), false);
-        if (s_failures >= STALE_AFTER_FAILURES) {
+        if (s_failures == STALE_AFTER_FAILURES) {
             dewview_ui_set_stale();
+            static char logmsg[64];
+            snprintf(logmsg, sizeof(logmsg), "Sensor sem resposta (%s)", s_sensor.lastError());
+            dewview_ui_log(logmsg);
         }
         Serial.printf("DewView: leitura falhou (%s)\n", s_sensor.lastError());
     }
+    dewview_ui_diag_update(s_ok_count, s_fail_count, s_sensor.lastError());
     lvgl_port_unlock();
 }

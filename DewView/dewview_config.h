@@ -20,7 +20,7 @@
  *  - DEWVIEW_MODBUS_RTU: o S24 e um sensor RS-485 nativo; liga-o diretamente
  *    ao terminal RS485 da ESP32-S3-Touch-LCD-5 (A/B) e nao precisas de rede.
  */
-#define DEWVIEW_MODBUS_MODE DEWVIEW_MODBUS_TCP
+#define DEWVIEW_MODBUS_MODE DEWVIEW_MODBUS_RTU
 
 /*========================= Access Point + OTA =============================*/
 

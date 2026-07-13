@@ -4,12 +4,18 @@ Dashboard para o módulo **Waveshare ESP32-S3-Touch-LCD-5** (1024×600 ou 800×4
 que mostra em tempo real a **temperatura**, o **ponto de orvalho** e a **humidade**
 lidos de um sensor **Banner S24 Dew Point (S24AS-D-MQP)** por Modbus.
 
-O ecrã apresenta:
+A interface é **touch**, com 3 páginas (separadores no fundo do ecrã, também
+navegáveis por deslize):
 
-- 4 cartões: Temperatura, Ponto de Orvalho, Humidade e **Margem T−Td** (risco de
-  condensação, com selo Seguro / Alerta / Risco);
-- Gráfico com o histórico das duas séries (~6 min com leituras a cada 3 s);
-- Barra de estado com a ligação WiFi/Modbus.
+1. **Painel** — 4 cartões com valores grandes, legíveis à distância:
+   Temperatura, Ponto de Orvalho, Humidade e **Margem T−Td** (risco de
+   condensação, com selo Seguro / Alerta / Risco);
+2. **Gráficos** — histórico de ~15 min (leituras a cada 3 s): temperatura +
+   ponto de orvalho num gráfico e humidade noutro;
+3. **Sistema** — diagnóstico: firmware, uptime, memória, rede/AP, estado do
+   Modbus (contadores de leituras/falhas, último erro) e registo de eventos.
+
+O cabeçalho mostra sempre o estado da ligação ao sensor.
 
 ## Rede e atualização de firmware (OTA)
 
@@ -37,8 +43,8 @@ O S24 é um sensor **Modbus RTU sobre RS-485** nativo. Há duas formas de o liga
 
 | Modo | Como | Configuração |
 |------|------|--------------|
-| **RTU (recomendado)** | Sensor ligado diretamente ao terminal RS485 (A/B) da placa. Não precisa de rede. | `DEWVIEW_MODBUS_MODE DEWVIEW_MODBUS_RTU` |
-| **TCP** | Sensor ligado a um gateway RS485→Modbus TCP (ex.: USR-DR302, Moxa MGate); a placa liga-se por WiFi. | `DEWVIEW_MODBUS_MODE DEWVIEW_MODBUS_TCP` (predefinido) |
+| **RTU (predefinido)** | Sensor ligado diretamente ao terminal RS485 (A/B) da placa. Não precisa de rede. | `DEWVIEW_MODBUS_MODE DEWVIEW_MODBUS_RTU` |
+| **TCP** | Sensor ligado a um gateway RS485→Modbus TCP (ex.: USR-DR302, Moxa MGate); a placa liga-se por WiFi. | `DEWVIEW_MODBUS_MODE DEWVIEW_MODBUS_TCP` |
 
 ### Ligações do S24 (modo RTU)
 
