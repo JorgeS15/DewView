@@ -92,6 +92,14 @@ Parâmetros de fábrica do S24: endereço **1**, **19200** baud, sem paridade (8
    - PSRAM: **OPI PSRAM**
 6. Compila e carrega.
 
+### Erro "Sketch too big" / "text section exceeds available space"
+
+Este erro significa que o **Partition Scheme** em Tools ficou no predefinido
+(1,3 MB para a aplicação). O módulo tem um ESP32-S3-WROOM-1 **N16R8** com 16 MB
+de flash: seleciona **Flash Size: 16MB (128Mb)** e **Partition Scheme:
+16M Flash (3MB APP/9.9MB FATFS)**. Além de resolver o erro, este esquema tem as
+duas partições de aplicação necessárias para o OTA.
+
 ### Nota sobre o RS485 (modo RTU)
 
 A porta RS485 da placa usa os **GPIO 43/44**, partilhados com o UART0. O sketch
