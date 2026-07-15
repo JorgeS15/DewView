@@ -365,7 +365,8 @@ static void create_page_diag(lv_obj_t *page)
     lv_label_set_text(s_diag_log, "(sem eventos)");
 }
 
-void dewview_ui_diag_update(uint32_t ok_count, uint32_t fail_count, const char *last_error)
+void dewview_ui_diag_update(uint32_t ok_count, uint32_t fail_count,
+                            const char *last_error, const char *modbus_desc)
 {
     char uptime[32];
     format_uptime(uptime, sizeof(uptime));
@@ -405,25 +406,14 @@ void dewview_ui_diag_update(uint32_t ok_count, uint32_t fail_count, const char *
 #endif
     lv_label_set_text(s_diag_net, buf);
 
-#if DEWVIEW_MODBUS_MODE == DEWVIEW_MODBUS_TCP
     snprintf(buf, sizeof(buf),
-             "Modo: TCP %s:%d (unit %d)\n"
+             "Modo: %s\n"
              "Leituras OK: %lu\n"
              "Falhas: %lu\n"
              "Ultimo erro: %s",
-             DEWVIEW_TCP_HOST, DEWVIEW_TCP_PORT, DEWVIEW_MODBUS_UNIT_ID,
+             modbus_desc,
              (unsigned long)ok_count, (unsigned long)fail_count,
              (last_error && last_error[0]) ? last_error : "-");
-#else
-    snprintf(buf, sizeof(buf),
-             "Modo: RTU RS485 %d 8N1 (addr %d)\n"
-             "Leituras OK: %lu\n"
-             "Falhas: %lu\n"
-             "Ultimo erro: %s",
-             DEWVIEW_RS485_BAUD, DEWVIEW_MODBUS_UNIT_ID,
-             (unsigned long)ok_count, (unsigned long)fail_count,
-             (last_error && last_error[0]) ? last_error : "-");
-#endif
     lv_label_set_text(s_diag_modbus, buf);
 }
 

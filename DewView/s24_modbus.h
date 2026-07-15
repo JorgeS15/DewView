@@ -42,6 +42,24 @@ public:
      */
     const char *lastErrorDetail() const { return _detail; }
 
+#if DEWVIEW_MODBUS_MODE == DEWVIEW_MODBUS_RTU
+    /**
+     * Parametros de comunicacao ativos. Comecam nos valores de
+     * dewview_config.h e podem ser alterados pelo auto-scan quando o sensor
+     * nao responde (sensor reconfigurado com outro baud/paridade/endereco).
+     */
+    void setParams(uint32_t baud, uint32_t serialConfig, uint8_t addr);
+    uint32_t activeBaud() const { return _baud; }
+    const char *activeParity() const;
+    uint8_t activeAddr() const { return _addr; }
+
+    /**
+     * Tenta ler o registo 40001 com os parametros indicados (timeout curto).
+     * Em caso de sucesso os parametros ficam ativos. Usado pelo auto-scan.
+     */
+    bool probe(uint32_t baud, uint32_t serialConfig, uint8_t addr, uint16_t timeoutMs);
+#endif
+
 private:
     bool readHoldingRegisters(uint16_t startAddr, uint16_t count, uint16_t *regs);
     void setDetail(const char *prefix, const uint8_t *data, size_t len);
@@ -52,6 +70,12 @@ private:
     uint16_t _txId = 0;
 #else
     static uint16_t crc16(const uint8_t *data, size_t len);
+    bool rtuTransact(uint8_t addr, uint16_t startAddr, uint16_t count,
+                     uint16_t *regs, uint16_t timeoutMs, bool withDetail);
+
+    uint32_t _baud = DEWVIEW_RS485_BAUD;
+    uint32_t _config = DEWVIEW_RS485_CONFIG;
+    uint8_t _addr = DEWVIEW_MODBUS_UNIT_ID;
 #endif
 
     const char *_error = "";

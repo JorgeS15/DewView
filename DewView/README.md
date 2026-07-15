@@ -62,6 +62,12 @@ contrário uma da outra! No S24, **B = +** e **A = −**; no transceiver da plac
 Se não comunicar, o primeiro teste é **trocar os fios branco e preto** — a
 troca de polaridade não danifica nada, simplesmente não comunica.
 
+**LEDs do sensor**: verde aceso = alimentado; laranja a piscar em sincronia
+com as leituras = os pedidos estão a chegar ao sensor (problema no retorno ou
+nos parâmetros). Desde a v1.1.5, se o sensor não responder o firmware faz um
+**auto-scan** de baud/paridade/endereço e adota os parâmetros que encontrar
+(resultado no registo de Eventos da página Sistema).
+
 Parâmetros de fábrica do S24: endereço **1**, **19200** baud, sem paridade (8N1).
 
 **Terminação de 120 Ω**: a placa já tem as resistências de terminação (R61/R15,

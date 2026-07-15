@@ -10,7 +10,7 @@
 
 /*============================ Identificacao ===============================*/
 
-#define DEWVIEW_VERSION     "1.1.4"
+#define DEWVIEW_VERSION     "1.1.5"
 #define DEWVIEW_DEVELOPER   "Jorge Santos - Equipack"
 
 /*======================== Modo de ligacao ao sensor =======================*/

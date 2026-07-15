@@ -1,4 +1,5 @@
 #include "s24_modbus.h"
+#include <driver/gpio.h>
 
 /* Registos do S24: 40001..40004 -> enderecos 0..3 no protocolo */
 static constexpr uint16_t S24_REG_START = 0;
@@ -141,8 +142,37 @@ bool S24Modbus::readHoldingRegisters(uint16_t startAddr, uint16_t count, uint16_
 
 void S24Modbus::begin()
 {
-    RS485.begin(DEWVIEW_RS485_BAUD, DEWVIEW_RS485_CONFIG,
-                DEWVIEW_RS485_RX_PIN, DEWVIEW_RS485_TX_PIN);
+    /*
+     * Os GPIO 43/44 sao partilhados com o UART0 (consola). Repor os pinos em
+     * modo GPIO/entrada antes de os entregar ao UART1 garante que o pad do
+     * GPIO43 nao fica preso como saida da consola (U0TXD) - nesse caso a
+     * resposta do sensor, que entra por uma resistencia serie de 4,7 k,
+     * nunca chegaria ao UART.
+     */
+    gpio_reset_pin((gpio_num_t)DEWVIEW_RS485_RX_PIN);
+    gpio_reset_pin((gpio_num_t)DEWVIEW_RS485_TX_PIN);
+    pinMode(DEWVIEW_RS485_RX_PIN, INPUT_PULLUP);
+
+    RS485.begin(_baud, _config, DEWVIEW_RS485_RX_PIN, DEWVIEW_RS485_TX_PIN);
+}
+
+void S24Modbus::setParams(uint32_t baud, uint32_t serialConfig, uint8_t addr)
+{
+    _baud = baud;
+    _config = serialConfig;
+    _addr = addr;
+    RS485.end();
+    begin();
+}
+
+const char *S24Modbus::activeParity() const
+{
+    switch (_config) {
+    case SERIAL_8N1: return "8N1";
+    case SERIAL_8E1: return "8E1";
+    case SERIAL_8O1: return "8O1";
+    default:         return "?";
+    }
 }
 
 uint16_t S24Modbus::crc16(const uint8_t *data, size_t len)
@@ -157,14 +187,15 @@ uint16_t S24Modbus::crc16(const uint8_t *data, size_t len)
     return crc;
 }
 
-bool S24Modbus::readHoldingRegisters(uint16_t startAddr, uint16_t count, uint16_t *regs)
+bool S24Modbus::rtuTransact(uint8_t addr, uint16_t startAddr, uint16_t count,
+                            uint16_t *regs, uint16_t timeoutMs, bool withDetail)
 {
     while (RS485.available()) {
         RS485.read();
     }
 
     uint8_t request[8] = {
-        DEWVIEW_MODBUS_UNIT_ID,
+        addr,
         0x03,
         (uint8_t)(startAddr >> 8), (uint8_t)startAddr,
         (uint8_t)(count >> 8), (uint8_t)count,
@@ -181,16 +212,18 @@ bool S24Modbus::readHoldingRegisters(uint16_t startAddr, uint16_t count, uint16_
     const size_t expected = 5 + 2 * count;
     uint8_t resp[5 + 2 * S24_REG_COUNT];
     size_t got = 0;
-    const uint32_t deadline = millis() + DEWVIEW_TIMEOUT_MS;
+    const uint32_t deadline = millis() + timeoutMs;
     while (got < expected && (int32_t)(deadline - millis()) > 0) {
         if (RS485.available()) {
             resp[got++] = (uint8_t)RS485.read();
             // Excecao Modbus: trama curta (endereco + 0x83 + codigo + CRC)
             if (got == 5 && resp[1] == 0x83) {
                 _error = "excecao Modbus do sensor";
-                char prefix[40];
-                snprintf(prefix, sizeof(prefix), "codigo de excecao 0x%02X", resp[2]);
-                setDetail(prefix, resp, got);
+                if (withDetail) {
+                    char prefix[40];
+                    snprintf(prefix, sizeof(prefix), "codigo de excecao 0x%02X", resp[2]);
+                    setDetail(prefix, resp, got);
+                }
                 return false;
             }
         } else {
@@ -200,26 +233,34 @@ bool S24Modbus::readHoldingRegisters(uint16_t startAddr, uint16_t count, uint16_
 
     if (got == 0) {
         _error = "sem resposta RS485";
-        setDetail("0 bytes recebidos: verificar A/B (polaridade), "
-                  "alimentacao do sensor e baud", nullptr, 0);
+        if (withDetail) {
+            setDetail("0 bytes recebidos: verificar A/B (polaridade), "
+                      "alimentacao do sensor e baud", nullptr, 0);
+        }
         return false;
     }
     if (got < expected) {
         _error = "resposta incompleta";
-        char prefix[40];
-        snprintf(prefix, sizeof(prefix), "%u de %u bytes", (unsigned)got, (unsigned)expected);
-        setDetail(prefix, resp, got);
+        if (withDetail) {
+            char prefix[40];
+            snprintf(prefix, sizeof(prefix), "%u de %u bytes", (unsigned)got, (unsigned)expected);
+            setDetail(prefix, resp, got);
+        }
         return false;
     }
-    if (resp[0] != DEWVIEW_MODBUS_UNIT_ID || resp[1] != 0x03 || resp[2] != 2 * count) {
+    if (resp[0] != addr || resp[1] != 0x03 || resp[2] != 2 * count) {
         _error = "resposta RTU invalida";
-        setDetail("cabecalho inesperado (endereco errado?)", resp, got);
+        if (withDetail) {
+            setDetail("cabecalho inesperado (endereco errado?)", resp, got);
+        }
         return false;
     }
     const uint16_t rxCrc = (uint16_t)resp[expected - 1] << 8 | resp[expected - 2];
     if (rxCrc != crc16(resp, expected - 2)) {
         _error = "erro de CRC";
-        setDetail("CRC invalido (ruido/polaridade?)", resp, got);
+        if (withDetail) {
+            setDetail("CRC invalido (ruido/polaridade?)", resp, got);
+        }
         return false;
     }
 
@@ -229,6 +270,22 @@ bool S24Modbus::readHoldingRegisters(uint16_t startAddr, uint16_t count, uint16_
     _error = "";
     _detail[0] = '\0';
     return true;
+}
+
+bool S24Modbus::readHoldingRegisters(uint16_t startAddr, uint16_t count, uint16_t *regs)
+{
+    return rtuTransact(_addr, startAddr, count, regs, DEWVIEW_TIMEOUT_MS, true);
+}
+
+bool S24Modbus::probe(uint32_t baud, uint32_t serialConfig, uint8_t addr, uint16_t timeoutMs)
+{
+    if (baud != _baud || serialConfig != _config) {
+        setParams(baud, serialConfig, addr);
+    } else {
+        _addr = addr;
+    }
+    uint16_t reg;
+    return rtuTransact(addr, 0, 1, &reg, timeoutMs, false);
 }
 
 #endif  // DEWVIEW_MODBUS_MODE
