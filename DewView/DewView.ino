@@ -36,6 +36,7 @@ void setup()
 {
     Serial.begin(115200);
 
+    Serial.println("DewView v" DEWVIEW_VERSION " - " DEWVIEW_DEVELOPER);
     Serial.println("DewView: inicializar placa");
     Board *board = new Board();
     board->init();

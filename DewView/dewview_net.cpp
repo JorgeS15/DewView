@@ -24,15 +24,17 @@ static void handle_root()
                  "<p>Ponto de orvalho: <b>%.1f &deg;C</b></p>"
                  "<p>Humidade: <b>%.1f %%HR</b></p>"
                  "<p>Margem T-Td: <b>%.1f &deg;C</b></p>"
-                 "<p><a href=\"/update\">Atualizar firmware</a></p>",
+                 "<p><a href=\"/update\">Atualizar firmware</a></p>"
+                 "<hr><small>DewView v" DEWVIEW_VERSION " &mdash; " DEWVIEW_DEVELOPER "</small>",
                  s_last_reading.tempC, s_last_reading.dewC,
                  s_last_reading.humidity, s_last_reading.tempC - s_last_reading.dewC);
     } else {
         snprintf(body, sizeof(body),
                  "<h1>DewView</h1><p>Sem dados do sensor.</p>"
-                 "<p><a href=\"/update\">Atualizar firmware</a></p>");
+                 "<p><a href=\"/update\">Atualizar firmware</a></p>"
+                 "<hr><small>DewView v" DEWVIEW_VERSION " &mdash; " DEWVIEW_DEVELOPER "</small>");
     }
-    char page[832];
+    char page[1024];
     snprintf(page, sizeof(page),
              "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
              "<meta http-equiv=\"refresh\" content=\"5\">"

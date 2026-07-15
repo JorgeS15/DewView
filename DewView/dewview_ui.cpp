@@ -372,7 +372,8 @@ void dewview_ui_diag_update(uint32_t ok_count, uint32_t fail_count, const char *
 
     char buf[320];
     snprintf(buf, sizeof(buf),
-             "Firmware: DewView (%s %s)\n"
+             "Firmware: DewView v" DEWVIEW_VERSION " (%s %s)\n"
+             "Desenvolvedor: " DEWVIEW_DEVELOPER "\n"
              "Uptime: %s\n"
              "Heap livre: %u KB (min %u KB)\n"
              "PSRAM livre: %u KB\n"
@@ -471,7 +472,7 @@ void dewview_ui_create()
     lv_obj_align(title, LV_ALIGN_LEFT_MID, 0, 0);
 
     lv_obj_t *subtitle = lv_label_create(header);
-    lv_label_set_text(subtitle, "Sensor S24  -  Ponto de Orvalho");
+    lv_label_set_text(subtitle, "Sensor S24  -  Ponto de Orvalho  |  v" DEWVIEW_VERSION);
     lv_obj_set_style_text_font(subtitle, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(subtitle, COL_TEXT_MUTED, 0);
     lv_obj_align_to(subtitle, title, LV_ALIGN_OUT_RIGHT_MID, 16, 2);
