@@ -5,6 +5,29 @@ ativa está definida em `DewView/dewview_config.h` (`DEWVIEW_VERSION`) e é
 mostrada no ecrã (cabeçalho e página Sistema), na página web e no arranque
 do monitor série.
 
+## v1.1.5 — 2026-07-15
+
+Correções de comunicação RS-485 (caso "0 bytes recebidos" com o LED laranja
+do sensor a piscar).
+
+### Correções
+
+- **GPIO43/44 (partilhados com o UART0)**: os pinos são agora repostos em modo
+  GPIO antes de serem entregues ao UART1 do RS-485. Evita que o pad do GPIO43
+  fique preso como saída da consola (U0TXD) e bloqueie a receção da resposta
+  do sensor.
+
+### Novidades
+
+- **Auto-scan do sensor**: ao fim de 4 falhas consecutivas, o firmware procura
+  o S24 em todas as combinações de baud (19200/9600/38400), paridade
+  (8N1/8E1/8O1) e endereço Modbus (1–16), adotando automaticamente os
+  parâmetros encontrados. O progresso aparece na barra de estado e o resultado
+  no registo de Eventos. Repete a cada 30 s enquanto não encontrar.
+- A página Sistema mostra os parâmetros de comunicação **ativos** (que podem
+  diferir dos configurados, se o auto-scan encontrou o sensor noutro
+  baud/endereço).
+
 ## v1.1.4 — 2026-07-15
 
 Primeira versão publicada.

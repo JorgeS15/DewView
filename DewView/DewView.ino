@@ -32,6 +32,55 @@ static int s_failures = 0;          // falhas consecutivas
 static uint32_t s_ok_count = 0;     // totais, para a pagina Sistema
 static uint32_t s_fail_count = 0;
 
+#if DEWVIEW_MODBUS_MODE == DEWVIEW_MODBUS_RTU
+/*
+ * Auto-scan: quando o sensor nao responde com os parametros configurados,
+ * percorre baud x paridade x endereco (1..16) ate o encontrar. Um probe por
+ * iteracao do loop() para manter a UI, o AP e o OTA a responder.
+ */
+static constexpr int SCAN_AFTER_FAILURES = 4;
+static constexpr uint16_t SCAN_PROBE_TIMEOUT_MS = 120;
+static constexpr uint32_t SCAN_RETRY_MS = 30000;
+static const uint32_t SCAN_BAUDS[] = {19200, 9600, 38400};
+static const uint32_t SCAN_SERIAL_CONFIGS[] = {SERIAL_8N1, SERIAL_8E1, SERIAL_8O1};
+static const char *SCAN_CONFIG_NAMES[] = {"8N1", "8E1", "8O1"};
+static constexpr uint8_t SCAN_MAX_ADDR = 16;
+static constexpr size_t SCAN_TOTAL = 3 * 3 * SCAN_MAX_ADDR;
+static bool s_scan_active = false;
+static size_t s_scan_idx = 0;
+static uint32_t s_scan_retry_at = 0;
+
+/* Faz um probe do scan; devolve true se o sensor foi encontrado. */
+static bool scan_step()
+{
+    const size_t combo = s_scan_idx / SCAN_MAX_ADDR;      // 0..8
+    const uint8_t addr = (s_scan_idx % SCAN_MAX_ADDR) + 1;
+    const uint32_t baud = SCAN_BAUDS[combo % 3];
+    const size_t cfg_i = combo / 3;
+
+    if (addr == 1) {  // novo grupo baud/paridade: atualiza o estado no ecra
+        static char status[48];
+        snprintf(status, sizeof(status), "A procurar sensor: %lu %s...",
+                 (unsigned long)baud, SCAN_CONFIG_NAMES[cfg_i]);
+        lvgl_port_lock(-1);
+        dewview_ui_set_status(status, false);
+        lvgl_port_unlock();
+    }
+
+    if (s_sensor.probe(baud, SCAN_SERIAL_CONFIGS[cfg_i], addr, SCAN_PROBE_TIMEOUT_MS)) {
+        static char msg[64];
+        snprintf(msg, sizeof(msg), "Sensor encontrado: %lu %s addr %u",
+                 (unsigned long)baud, SCAN_CONFIG_NAMES[cfg_i], addr);
+        Serial.println(msg);
+        lvgl_port_lock(-1);
+        dewview_ui_log(msg);
+        lvgl_port_unlock();
+        return true;
+    }
+    return false;
+}
+#endif  // DEWVIEW_MODBUS_MODE == DEWVIEW_MODBUS_RTU
+
 void setup()
 {
     Serial.begin(115200);
@@ -91,6 +140,33 @@ void loop()
         delay(100);
         return;
     }
+#else
+    /* Auto-scan de baud/paridade/endereco quando o sensor nao responde */
+    if (s_scan_active) {
+        if (scan_step()) {
+            s_scan_active = false;
+            s_failures = 0;
+            s_last_poll = 0;  // le ja com os parametros encontrados
+        } else if (++s_scan_idx >= SCAN_TOTAL) {
+            s_scan_active = false;
+            s_scan_retry_at = millis() + SCAN_RETRY_MS;
+            s_sensor.setParams(DEWVIEW_RS485_BAUD, DEWVIEW_RS485_CONFIG,
+                               DEWVIEW_MODBUS_UNIT_ID);
+            lvgl_port_lock(-1);
+            dewview_ui_log("Procura sem resposta: verificar cablagem");
+            dewview_ui_set_status("Sensor nao encontrado", false);
+            lvgl_port_unlock();
+        }
+        return;
+    }
+    if (s_failures >= SCAN_AFTER_FAILURES && (int32_t)(millis() - s_scan_retry_at) > 0) {
+        s_scan_active = true;
+        s_scan_idx = 0;
+        lvgl_port_lock(-1);
+        dewview_ui_log("A procurar sensor no barramento...");
+        lvgl_port_unlock();
+        return;
+    }
 #endif
 
     if (millis() - s_last_poll < DEWVIEW_POLL_MS && s_last_poll != 0) {
@@ -142,6 +218,15 @@ void loop()
     } else {
         snprintf(err_full, sizeof(err_full), "%s", s_sensor.lastError());
     }
-    dewview_ui_diag_update(s_ok_count, s_fail_count, err_full);
+    static char modbus_desc[64];
+#if DEWVIEW_MODBUS_MODE == DEWVIEW_MODBUS_TCP
+    snprintf(modbus_desc, sizeof(modbus_desc), "TCP %s:%d (unit %d)",
+             DEWVIEW_TCP_HOST, DEWVIEW_TCP_PORT, DEWVIEW_MODBUS_UNIT_ID);
+#else
+    snprintf(modbus_desc, sizeof(modbus_desc), "RTU RS485 %lu %s (addr %u)",
+             (unsigned long)s_sensor.activeBaud(), s_sensor.activeParity(),
+             s_sensor.activeAddr());
+#endif
+    dewview_ui_diag_update(s_ok_count, s_fail_count, err_full, modbus_desc);
     lvgl_port_unlock();
 }

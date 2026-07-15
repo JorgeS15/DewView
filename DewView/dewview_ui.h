@@ -25,9 +25,11 @@ void dewview_ui_set_status(const char *text, bool ok);
 
 /**
  * Atualiza a pagina Sistema: contadores Modbus, memoria, rede e uptime.
+ * `modbus_desc` descreve a ligacao ativa (ex.: "RTU RS485 19200 8N1 (addr 1)").
  * Chamar periodicamente (ex.: em cada ciclo de leitura).
  */
-void dewview_ui_diag_update(uint32_t ok_count, uint32_t fail_count, const char *last_error);
+void dewview_ui_diag_update(uint32_t ok_count, uint32_t fail_count,
+                            const char *last_error, const char *modbus_desc);
 
 /** Acrescenta uma linha (com uptime) ao registo de eventos da pagina Sistema. */
 void dewview_ui_log(const char *msg);
