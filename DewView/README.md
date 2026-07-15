@@ -48,16 +48,27 @@ O S24 é um sensor **Modbus RTU sobre RS-485** nativo. Há duas formas de o liga
 
 ### Ligações do S24 (modo RTU)
 
-Conector M12 de 4 pinos do S24 → terminal RS485 da placa + fonte externa:
+⚠️ **Atenção à polaridade**: a Banner e a Waveshare usam a letra A/B ao
+contrário uma da outra! No S24, **B = +** e **A = −**; no transceiver da placa
+(SP3485), **A = +** e **B = −**. Liga pelos sinais **+/−**, não pelas letras:
 
-| Pino S24 | Cor | Ligação |
-|----------|-----|---------|
-| 1 | Castanho | +10…30 V DC (fonte externa, ex.: 24 V) |
-| 2 | Branco | RS485 **B** (D1/+) |
-| 3 | Azul | GND (comum com a fonte e com a placa) |
-| 4 | Preto | RS485 **A** (D0/−) |
+| Pino S24 | Cor | Sinal | Terminal da placa |
+|----------|-----|-------|-------------------|
+| 1 | Castanho | +10…30 V DC | — (fonte externa, ex.: 24 V) |
+| 2 | Branco | RS485 **+** (D1/B do sensor) | **A** |
+| 3 | Azul | GND | GND (comum com a fonte e com a placa) |
+| 4 | Preto | RS485 **−** (D0/A do sensor) | **B** |
+
+Se não comunicar, o primeiro teste é **trocar os fios branco e preto** — a
+troca de polaridade não danifica nada, simplesmente não comunica.
 
 Parâmetros de fábrica do S24: endereço **1**, **19200** baud, sem paridade (8N1).
+
+**Terminação de 120 Ω**: a placa já tem as resistências de terminação (R61/R15,
+120 Ω) selecionáveis pelo pequeno **interruptor DIP (SW2)** junto aos terminais
+RS485/CAN — não é preciso soldar nada. Para um cabo curto a 19200 baud a
+terminação é dispensável; para cabos longos (>10 m), liga a posição do RS485.
+As resistências de polarização (bias, 4,7 kΩ) já estão na placa.
 
 ## Registos Modbus usados (manual p/n 235396 Rev. B)
 
@@ -91,6 +102,14 @@ Parâmetros de fábrica do S24: endereço **1**, **19200** baud, sem paridade (8
    - Flash Size: **16MB**, Partition Scheme: **16M Flash (3MB APP/9.9MB FATFS)**
    - PSRAM: **OPI PSRAM**
 6. Compila e carrega.
+
+### Erro "Sketch too big" / "text section exceeds available space"
+
+Este erro significa que o **Partition Scheme** em Tools ficou no predefinido
+(1,3 MB para a aplicação). O módulo tem um ESP32-S3-WROOM-1 **N16R8** com 16 MB
+de flash: seleciona **Flash Size: 16MB (128Mb)** e **Partition Scheme:
+16M Flash (3MB APP/9.9MB FATFS)**. Além de resolver o erro, este esquema tem as
+duas partições de aplicação necessárias para o OTA.
 
 ### Nota sobre o RS485 (modo RTU)
 

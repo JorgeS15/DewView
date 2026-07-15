@@ -36,6 +36,7 @@ void setup()
 {
     Serial.begin(115200);
 
+    Serial.println("DewView v" DEWVIEW_VERSION " - " DEWVIEW_DEVELOPER);
     Serial.println("DewView: inicializar placa");
     Board *board = new Board();
     board->init();
@@ -131,8 +132,16 @@ void loop()
             snprintf(logmsg, sizeof(logmsg), "Sensor sem resposta (%s)", s_sensor.lastError());
             dewview_ui_log(logmsg);
         }
-        Serial.printf("DewView: leitura falhou (%s)\n", s_sensor.lastError());
+        Serial.printf("DewView: leitura falhou (%s) %s\n",
+                      s_sensor.lastError(), s_sensor.lastErrorDetail());
     }
-    dewview_ui_diag_update(s_ok_count, s_fail_count, s_sensor.lastError());
+    static char err_full[160];
+    if (s_sensor.lastErrorDetail()[0] != '\0') {
+        snprintf(err_full, sizeof(err_full), "%s\n%s",
+                 s_sensor.lastError(), s_sensor.lastErrorDetail());
+    } else {
+        snprintf(err_full, sizeof(err_full), "%s", s_sensor.lastError());
+    }
+    dewview_ui_diag_update(s_ok_count, s_fail_count, err_full);
     lvgl_port_unlock();
 }

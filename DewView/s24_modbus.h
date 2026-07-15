@@ -32,10 +32,19 @@ public:
      */
     bool read(S24Reading &out);
 
+    /** Mensagem curta do ultimo erro (ex.: "sem resposta RS485"). */
     const char *lastError() const { return _error; }
+
+    /**
+     * Detalhe tecnico do ultimo erro: numero de bytes recebidos e dump
+     * hexadecimal da resposta, para diagnostico de cablagem/baud/endereco.
+     * String vazia se a ultima leitura foi bem sucedida.
+     */
+    const char *lastErrorDetail() const { return _detail; }
 
 private:
     bool readHoldingRegisters(uint16_t startAddr, uint16_t count, uint16_t *regs);
+    void setDetail(const char *prefix, const uint8_t *data, size_t len);
 
 #if DEWVIEW_MODBUS_MODE == DEWVIEW_MODBUS_TCP
     bool ensureConnected();
@@ -46,4 +55,5 @@ private:
 #endif
 
     const char *_error = "";
+    char _detail[96] = "";
 };

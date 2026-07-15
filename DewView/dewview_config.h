@@ -8,6 +8,11 @@
 
 #pragma once
 
+/*============================ Identificacao ===============================*/
+
+#define DEWVIEW_VERSION     "1.1.4"
+#define DEWVIEW_DEVELOPER   "Jorge Santos - Equipack"
+
 /*======================== Modo de ligacao ao sensor =======================*/
 
 #define DEWVIEW_MODBUS_TCP  0   // S24 ligado a um gateway RS485 -> Modbus TCP (via WiFi)
