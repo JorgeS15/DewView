@@ -1,0 +1,107 @@
+name: Build e Release
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Instalar arduino-cli
+        uses: arduino/setup-arduino-cli@v2
+
+      - name: Cache do core ESP32
+        uses: actions/cache@v4
+        with:
+          path: ~/.arduino15
+          key: arduino-esp32-3.0.7
+
+      - name: Instalar core ESP32
+        run: |
+          arduino-cli config init --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32@3.0.7
+
+      - name: Instalar bibliotecas do repositorio
+        run: |
+          mkdir -p ~/Arduino/libraries
+          cp -r ESP32-S3-Touch-LCD-5-Demo/Arduino/libraries/* ~/Arduino/libraries/
+
+      # ESP32-S3-WROOM-1-N16R8: flash 16MB (particoes 3MB APP para OTA), PSRAM OPI
+      - name: Compilar DewView
+        run: |
+          arduino-cli compile \
+            --fqbn "esp32:esp32:esp32s3:FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=opi,CDCOnBoot=cdc" \
+            --output-dir build \
+            DewView
+
+      - name: Extrair versao
+        id: ver
+        run: |
+          V=$(grep -oP '#define DEWVIEW_VERSION\s+"\K[0-9.]+' DewView/dewview_config.h)
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "Versao: $V"
+
+      - name: Preparar binarios
+        run: |
+          V="${{ steps.ver.outputs.version }}"
+          mkdir -p dist
+          # Binario da aplicacao: e este que se carrega na pagina OTA (/update)
+          cp build/DewView.ino.bin "dist/DewView-v${V}-OTA.bin"
+          # Imagem completa: para gravar por USB (esptool a partir do endereco 0x0)
+          if [ -f build/DewView.ino.merged.bin ]; then
+            cp build/DewView.ino.merged.bin "dist/DewView-v${V}-USB-completo.bin"
+          fi
+          ls -la dist/
+
+      - name: Guardar artefactos
+        uses: actions/upload-artifact@v4
+        with:
+          name: DewView-v${{ steps.ver.outputs.version }}
+          path: dist/*
+
+      - name: Verificar se a tag ja existe
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: tag
+        run: |
+          V="${{ steps.ver.outputs.version }}"
+          if git ls-remote --tags origin "refs/tags/v${V}" | grep -q .; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "A tag v${V} ja existe - nao sera criada nova release."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Extrair notas do CHANGELOG
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.tag.outputs.exists == 'false'
+        run: |
+          V="${{ steps.ver.outputs.version }}"
+          # Seccao "## v1.1.4 ..." do CHANGELOG.md ate ao proximo "## "
+          awk -v ver="$V" '
+            $0 ~ "^## v"ver { on=1; next }
+            on && /^## / { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md || true
+          if [ ! -s notes.md ]; then
+            echo "Ver o historico de commits para os detalhes desta versao." > notes.md
+          fi
+          cat notes.md
+
+      - name: Criar release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.tag.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: DewView v${{ steps.ver.outputs.version }}
+          body_path: notes.md
+          generate_release_notes: true
+          files: dist/*
