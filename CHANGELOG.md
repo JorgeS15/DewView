@@ -15,6 +15,13 @@ do monitor série.
   (`dewview_font_96.c`, Montserrat, só dígitos e símbolos), gerada com
   `lv_font_conv`. Os 4 cartões do Painel mostram agora os valores em grande.
 
+### Correções (cont.)
+
+- **Escala vertical dos gráficos cortada**: as etiquetas do eixo Y eram
+  desenhadas fora do gráfico e o cartão cortava-as (só se via o último
+  dígito). O gráfico foi encolhido e alinhado à direita, reservando 44 px
+  para a escala dentro do cartão.
+
 ### Alterações
 
 - **Taxa de leitura: 2 Hz** (uma leitura a cada 500 ms, antes 3 s), para uma

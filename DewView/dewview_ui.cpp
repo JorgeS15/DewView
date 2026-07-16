@@ -203,12 +203,17 @@ static void create_page_dashboard(lv_obj_t *page)
 
 /*=========================== Pagina 2: Graficos ===========================*/
 
-static lv_obj_t *make_chart(lv_obj_t *card, lv_coord_t h)
+/*
+ * As etiquetas do eixo Y sao desenhadas pelo LVGL a esquerda do gafico,
+ * FORA do objeto (lv_chart draw_y_ticks usa coords.x1). O grafico e por isso
+ * encolhido em `w` e alinhado a direita, deixando espaco para a escala
+ * dentro do cartao (senao o cartao corta as etiquetas).
+ */
+static lv_obj_t *make_chart(lv_obj_t *card, lv_coord_t w, lv_coord_t h)
 {
     lv_obj_t *chart = lv_chart_create(card);
-    lv_obj_set_size(chart, LV_PCT(100), h);
-    lv_obj_align(chart, LV_ALIGN_BOTTOM_MID, 0, 0);
-    lv_obj_set_style_pad_left(chart, 44, 0);   // espaco para os ticks do eixo Y
+    lv_obj_set_size(chart, w, h);
+    lv_obj_align(chart, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
     lv_obj_set_style_bg_opa(chart, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(chart, 0, 0);
     lv_obj_set_style_line_color(chart, COL_GRID, LV_PART_MAIN);   // grelha recessiva
@@ -236,6 +241,9 @@ static void create_page_charts(lv_obj_t *page)
     const lv_coord_t avail_h = LV_VER_RES - HEADER_H - TABBAR_H - 2 * 12 - 12;
     const lv_coord_t card_td_h = (avail_h * 3) / 5;
     const lv_coord_t card_rh_h = avail_h - card_td_h;
+    /* largura do grafico: pagina - pad da pagina (2x12) - pad do cartao (2x12)
+     * - 44 px reservados para as etiquetas do eixo Y */
+    const lv_coord_t chart_w = LV_HOR_RES - 2 * 12 - 2 * 12 - 44;
 
     /* Temperatura + ponto de orvalho (mesmo eixo, degC) */
     lv_obj_t *card_td = make_card(page);
@@ -261,7 +269,7 @@ static void create_page_charts(lv_obj_t *page)
     lv_obj_set_style_border_width(spacer, 0, 0);
     make_legend_entry(legend, "Ponto de orvalho (°C)", COL_DEW);
 
-    s_chart_td = make_chart(card_td, card_td_h - 24 - 24 - 8);
+    s_chart_td = make_chart(card_td, chart_w, card_td_h - 24 - 24 - 8);
     lv_chart_set_range(s_chart_td, LV_CHART_AXIS_PRIMARY_Y, TO_TENTHS(-10), TO_TENTHS(40));
     s_ser_temp = lv_chart_add_series(s_chart_td, COL_TEMP, LV_CHART_AXIS_PRIMARY_Y);
     s_ser_dew  = lv_chart_add_series(s_chart_td, COL_DEW, LV_CHART_AXIS_PRIMARY_Y);
@@ -280,7 +288,7 @@ static void create_page_charts(lv_obj_t *page)
     lv_obj_set_style_text_color(rh_title, COL_TEXT_2, 0);
     lv_obj_align(rh_title, LV_ALIGN_TOP_LEFT, 0, 0);
 
-    s_chart_rh = make_chart(card_rh, card_rh_h - 24 - 24 - 8);
+    s_chart_rh = make_chart(card_rh, chart_w, card_rh_h - 24 - 24 - 8);
     lv_chart_set_range(s_chart_rh, LV_CHART_AXIS_PRIMARY_Y, 0, TO_TENTHS(100));
     s_ser_rh = lv_chart_add_series(s_chart_rh, COL_RH, LV_CHART_AXIS_PRIMARY_Y);
     lv_chart_set_all_value(s_chart_rh, s_ser_rh, LV_CHART_POINT_NONE);
