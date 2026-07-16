@@ -10,7 +10,7 @@
 
 /*============================ Identificacao ===============================*/
 
-#define DEWVIEW_VERSION     "1.1.5"
+#define DEWVIEW_VERSION     "1.1.6"
 #define DEWVIEW_DEVELOPER   "Jorge Santos - Equipack"
 
 /*======================== Modo de ligacao ao sensor =======================*/
@@ -74,7 +74,7 @@
 /*============================ Parametros Modbus ===========================*/
 
 #define DEWVIEW_MODBUS_UNIT_ID  1       // Endereco Modbus do S24 (fabrica: 1)
-#define DEWVIEW_POLL_MS         3000    // Intervalo de leitura (o S24 amostra a cada 3 s)
+#define DEWVIEW_POLL_MS         2000    // Intervalo de leitura: 0.5 Hz (o S24 amostra a cada 3 s)
 #define DEWVIEW_TIMEOUT_MS      1000    // Timeout de resposta Modbus
 
 /*====================== Escalas dos registos do S24 =======================*/

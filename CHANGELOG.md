@@ -5,6 +5,24 @@ ativa está definida em `DewView/dewview_config.h` (`DEWVIEW_VERSION`) e é
 mostrada no ecrã (cabeçalho e página Sistema), na página web e no arranque
 do monitor série.
 
+## v1.1.6 — 2026-07-16
+
+### Correções
+
+- **Painel principal sem valores**: os números grandes eram ampliados com
+  `transform_zoom` do LVGL, que não é fiável em labels — os valores ficavam
+  invisíveis. Substituído por uma fonte dedicada de **96 px**
+  (`dewview_font_96.c`, Montserrat, só dígitos e símbolos), gerada com
+  `lv_font_conv`. Os 4 cartões do Painel mostram agora os valores em grande.
+
+### Alterações
+
+- **Taxa de leitura: 0,5 Hz** (uma leitura a cada 2 s, antes 3 s). O histórico
+  dos gráficos passa a cobrir ~10 min.
+- **Páginas web renovadas**: visual escuro igual ao do ecrã, cartões coloridos
+  com os valores e o selo de risco, e página de atualização OTA com barra de
+  progresso e estado do upload.
+
 ## v1.1.5 — 2026-07-15
 
 Correções de comunicação RS-485 (caso "0 bytes recebidos" com o LED laranja

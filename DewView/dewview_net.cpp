@@ -14,34 +14,99 @@ static volatile bool s_ota_busy = false;
 
 /*------------------------------ Paginas web ------------------------------*/
 
+/* Cabeca comum (CSS com a mesma paleta do ecra). Fora do snprintf para nao
+ * ter de escapar os '%' do CSS. */
+static const char PAGE_HEAD[] PROGMEM = R"raw(<!DOCTYPE html><html lang="pt"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DewView</title><style>
+:root{--bg:#111110;--card:#1a1a19;--tx:#fff;--tx2:#c3c2b7;--mut:#8a897e;
+--temp:#d95926;--dew:#3987e5;--rh:#199e70;--ok:#2ea36e;--warn:#c98500;--crit:#e66767}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,sans-serif;
+min-height:100vh;display:flex;flex-direction:column}
+header{background:var(--card);padding:14px 20px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+header h1{font-size:22px;letter-spacing:.5px}
+header small{color:var(--mut)}
+main{flex:1;width:100%;max-width:860px;margin:0 auto;padding:16px;display:grid;
+grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;align-content:start}
+.card{background:var(--card);border-radius:12px;padding:18px;border-left:6px solid var(--mut)}
+.card h2{font-size:14px;font-weight:600;color:var(--tx2);text-transform:uppercase;letter-spacing:.05em}
+.card .v{font-size:52px;font-weight:700;margin-top:6px;font-variant-numeric:tabular-nums}
+.card .v small{font-size:18px;color:var(--mut);font-weight:400}
+.t{border-color:var(--temp)}.d{border-color:var(--dew)}.h{border-color:var(--rh)}
+.badge{display:inline-block;margin-top:10px;padding:5px 14px;border-radius:16px;
+color:#111;font-size:13px;font-weight:700}
+.hint{color:var(--tx2);font-size:14px;line-height:1.5;margin:10px 0 16px}
+.btn{background:var(--dew);color:#fff;border:0;border-radius:8px;padding:12px 22px;
+font-size:15px;font-weight:600;cursor:pointer;width:100%}
+.btn:disabled{background:var(--mut)}
+input[type=file]{color:var(--tx2);width:100%;padding:10px;background:var(--bg);
+border:1px dashed var(--mut);border-radius:8px}
+progress{width:100%;height:12px;margin-top:14px;accent-color:var(--dew)}
+#s{color:var(--tx2);margin-top:10px;font-size:14px}
+footer{color:var(--mut);text-align:center;padding:14px;font-size:12px}
+footer a{color:var(--dew);text-decoration:none}
+</style></head><body>
+<header><h1>DewView</h1><small>Sensor S24 &middot; Ponto de Orvalho</small></header>
+)raw";
+
+static const char PAGE_FOOT[] PROGMEM =
+    "<footer><a href=\"/update\">Atualizar firmware</a> &middot; "
+    "DewView v" DEWVIEW_VERSION " &mdash; " DEWVIEW_DEVELOPER "</footer></body></html>";
+
+static void send_page(const char *body)
+{
+    s_server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    s_server.send(200, "text/html", "");
+    s_server.sendContent_P(PAGE_HEAD);
+    s_server.sendContent(body);
+    s_server.sendContent_P(PAGE_FOOT);
+    s_server.sendContent("");  // termina a resposta chunked
+}
+
+static void format_value(char *buf, size_t len, float v)
+{
+    snprintf(buf, len, "%.1f", v);
+}
+
 static void handle_root()
 {
-    char body[640];
+    char t[16] = "--", d[16] = "--", h[16] = "--", m[16] = "--";
+    const char *badge_color = "var(--warn)";
+    const char *badge_text = "Sem dados";
+
     if (s_last_ok) {
-        snprintf(body, sizeof(body),
-                 "<h1>DewView</h1>"
-                 "<p>Temperatura: <b>%.1f &deg;C</b></p>"
-                 "<p>Ponto de orvalho: <b>%.1f &deg;C</b></p>"
-                 "<p>Humidade: <b>%.1f %%HR</b></p>"
-                 "<p>Margem T-Td: <b>%.1f &deg;C</b></p>"
-                 "<p><a href=\"/update\">Atualizar firmware</a></p>"
-                 "<hr><small>DewView v" DEWVIEW_VERSION " &mdash; " DEWVIEW_DEVELOPER "</small>",
-                 s_last_reading.tempC, s_last_reading.dewC,
-                 s_last_reading.humidity, s_last_reading.tempC - s_last_reading.dewC);
-    } else {
-        snprintf(body, sizeof(body),
-                 "<h1>DewView</h1><p>Sem dados do sensor.</p>"
-                 "<p><a href=\"/update\">Atualizar firmware</a></p>"
-                 "<hr><small>DewView v" DEWVIEW_VERSION " &mdash; " DEWVIEW_DEVELOPER "</small>");
+        const float margin = s_last_reading.tempC - s_last_reading.dewC;
+        format_value(t, sizeof(t), s_last_reading.tempC);
+        format_value(d, sizeof(d), s_last_reading.dewC);
+        format_value(h, sizeof(h), s_last_reading.humidity);
+        format_value(m, sizeof(m), margin);
+        if (margin >= DEWVIEW_MARGIN_OK) {
+            badge_color = "var(--ok)";
+            badge_text = "Seguro";
+        } else if (margin >= DEWVIEW_MARGIN_WARN) {
+            badge_color = "var(--warn)";
+            badge_text = "Alerta";
+        } else {
+            badge_color = "var(--crit)";
+            badge_text = "Risco de condensacao";
+        }
     }
-    char page[1024];
-    snprintf(page, sizeof(page),
-             "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
-             "<meta http-equiv=\"refresh\" content=\"5\">"
-             "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-             "<title>DewView</title></head>"
-             "<body style=\"font-family:sans-serif\">%s</body></html>", body);
-    s_server.send(200, "text/html", page);
+
+    char body[1024];
+    snprintf(body, sizeof(body),
+             "<main>"
+             "<div class=\"card t\"><h2>Temperatura</h2><p class=\"v\">%s <small>&deg;C</small></p></div>"
+             "<div class=\"card d\"><h2>Ponto de Orvalho</h2><p class=\"v\">%s <small>&deg;C</small></p></div>"
+             "<div class=\"card h\"><h2>Humidade</h2><p class=\"v\">%s <small>%%HR</small></p></div>"
+             "<div class=\"card\"><h2>Margem T&minus;Td</h2><p class=\"v\">%s <small>&deg;C</small></p>"
+             "<span class=\"badge\" style=\"background:%s\">%s</span></div>"
+             "</main>"
+             /* auto-refresh so na pagina de estado (JS para nao afetar /update) */
+             "<script>setTimeout(()=>location.reload(),5000)</script>",
+             t, d, h, m, badge_color, badge_text);
+
+    send_page(body);
 }
 
 static bool check_auth()
@@ -58,17 +123,31 @@ static void handle_update_form()
     if (!check_auth()) {
         return;
     }
-    s_server.send(200, "text/html",
-                  "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
-                  "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-                  "<title>DewView OTA</title></head>"
-                  "<body style=\"font-family:sans-serif\">"
-                  "<h1>Atualizar firmware</h1>"
-                  "<p>Escolhe o ficheiro .bin (Sketch &gt; Export Compiled Binary no Arduino IDE).</p>"
-                  "<form method=\"POST\" action=\"/update\" enctype=\"multipart/form-data\">"
-                  "<input type=\"file\" name=\"firmware\" accept=\".bin\">"
-                  "<input type=\"submit\" value=\"Atualizar\">"
-                  "</form></body></html>");
+    static const char body[] =
+        "<main style=\"grid-template-columns:1fr;max-width:560px\">"
+        "<div class=\"card d\"><h2>Atualizar firmware</h2>"
+        "<p class=\"hint\">Escolhe o ficheiro <b>DewView-vX.Y.Z-OTA.bin</b> "
+        "(das releases do GitHub ou exportado do Arduino IDE) e carrega em Atualizar. "
+        "A placa reinicia sozinha no fim.</p>"
+        "<form id=\"f\"><input type=\"file\" name=\"firmware\" accept=\".bin\" required>"
+        "<br><br><button class=\"btn\" type=\"submit\">Atualizar</button></form>"
+        "<progress id=\"p\" max=\"100\" value=\"0\" hidden></progress><p id=\"s\"></p>"
+        "</div></main>"
+        "<script>"
+        "const f=document.getElementById('f'),p=document.getElementById('p'),"
+        "s=document.getElementById('s'),b=f.querySelector('button');"
+        "f.addEventListener('submit',e=>{e.preventDefault();"
+        "const x=new XMLHttpRequest();const d=new FormData(f);"
+        "p.hidden=false;b.disabled=true;s.textContent='A enviar...';"
+        "x.open('POST','/update');"
+        "x.upload.onprogress=ev=>{if(ev.lengthComputable)p.value=ev.loaded/ev.total*100};"
+        "x.onload=()=>{if(x.status==200){s.textContent='Atualizado! A placa esta a reiniciar; "
+        "aguarda ~20 s e volta a ligar-te a rede DewView.';}"
+        "else{s.textContent='Falha na atualizacao ('+x.status+'). Ve a pagina Sistema.';b.disabled=false;}};"
+        "x.onerror=()=>{s.textContent='Ligacao perdida (normal se a placa ja reiniciou).';};"
+        "x.send(d);});"
+        "</script>";
+    send_page(body);
 }
 
 static void handle_update_done()
@@ -78,12 +157,10 @@ static void handle_update_done()
     }
     s_ota_busy = false;
     if (Update.hasError()) {
-        s_server.send(500, "text/html",
-                      "<meta charset=\"utf-8\">Falha na atualizacao. Ver monitor serie.");
+        s_server.send(500, "text/plain", "Falha na atualizacao.");
     } else {
         s_server.client().setNoDelay(true);
-        s_server.send(200, "text/html",
-                      "<meta charset=\"utf-8\">Atualizado com sucesso. A reiniciar...");
+        s_server.send(200, "text/plain", "OK");
         delay(500);
         ESP.restart();
     }
