@@ -41,7 +41,7 @@ LV_FONT_DECLARE(dewview_font_96);
 
 #define HEADER_H        56
 #define TABBAR_H        56
-#define CHART_POINTS    300   // ~10 min de historico com poll de 2 s (0.5 Hz)
+#define CHART_POINTS    600   // ~5 min de historico com poll de 500 ms (2 Hz)
 #define LOG_MAX_CHARS   700   // registo de eventos da pagina Sistema
 
 /* Valores no grafico em decimos (0.1 degC / 0.1 %HR) */

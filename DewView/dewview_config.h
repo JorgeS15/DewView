@@ -74,7 +74,7 @@
 /*============================ Parametros Modbus ===========================*/
 
 #define DEWVIEW_MODBUS_UNIT_ID  1       // Endereco Modbus do S24 (fabrica: 1)
-#define DEWVIEW_POLL_MS         2000    // Intervalo de leitura: 0.5 Hz (o S24 amostra a cada 3 s)
+#define DEWVIEW_POLL_MS         500     // Intervalo de leitura: 2 Hz (nota: o S24 so amostra a cada 3 s)
 #define DEWVIEW_TIMEOUT_MS      1000    // Timeout de resposta Modbus
 
 /*====================== Escalas dos registos do S24 =======================*/

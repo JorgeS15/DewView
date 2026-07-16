@@ -17,8 +17,10 @@ do monitor série.
 
 ### Alterações
 
-- **Taxa de leitura: 0,5 Hz** (uma leitura a cada 2 s, antes 3 s). O histórico
-  dos gráficos passa a cobrir ~10 min.
+- **Taxa de leitura: 2 Hz** (uma leitura a cada 500 ms, antes 3 s), para uma
+  resposta mais imediata no ecrã. O gráfico guarda 600 pontos (~5 min).
+  Nota: o S24 amostra internamente a cada 3 s, pelo que valores consecutivos
+  podem repetir-se.
 - **Páginas web renovadas**: visual escuro igual ao do ecrã, cartões coloridos
   com os valores e o selo de risco, e página de atualização OTA com barra de
   progresso e estado do upload.
