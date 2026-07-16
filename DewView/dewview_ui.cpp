@@ -36,9 +36,12 @@
 #define DEW_FONT_UNIT   lv_font_montserrat_16
 #endif
 
+/* Fonte grande (96 px, so digitos/simbolos) gerada em dewview_font_96.c */
+LV_FONT_DECLARE(dewview_font_96);
+
 #define HEADER_H        56
 #define TABBAR_H        56
-#define CHART_POINTS    300   // ~15 min de historico com poll de 3 s
+#define CHART_POINTS    600   // ~5 min de historico com poll de 500 ms (2 Hz)
 #define LOG_MAX_CHARS   700   // registo de eventos da pagina Sistema
 
 /* Valores no grafico em decimos (0.1 degC / 0.1 %HR) */
@@ -124,12 +127,10 @@ static void make_legend_entry(lv_obj_t *parent, const char *text, lv_color_t col
 
 /*============================ Pagina 1: Painel ============================*/
 
-/*
- * Cartao grande 2x2. `zoom` amplia o valor (256 = 1x, 512 = 2x) para ser
- * legivel a distancia; a ampliacao e feita em torno do centro do texto.
- */
+/* Cartao grande 2x2 com o valor em fonte dedicada, legivel a distancia. */
 static lv_obj_t *make_big_tile(lv_obj_t *parent, const char *title, lv_color_t accent,
-                               const char *unit, uint16_t zoom, lv_obj_t **value_out)
+                               const char *unit, const lv_font_t *value_font,
+                               lv_obj_t **value_out)
 {
     lv_obj_t *card = make_card(parent);
 
@@ -154,14 +155,8 @@ static lv_obj_t *make_big_tile(lv_obj_t *parent, const char *title, lv_color_t a
 
     lv_obj_t *value = lv_label_create(card);
     lv_label_set_text(value, "--");
-    lv_obj_set_style_text_font(value, &DEW_FONT_VALUE, 0);
+    lv_obj_set_style_text_font(value, value_font, 0);
     lv_obj_set_style_text_color(value, COL_TEXT, 0);
-    if (zoom != LV_IMG_ZOOM_NONE) {
-        /* Amplia em torno do centro do texto para se manter centrado */
-        lv_obj_set_style_transform_pivot_x(value, LV_PCT(50), 0);
-        lv_obj_set_style_transform_pivot_y(value, LV_PCT(50), 0);
-        lv_obj_set_style_transform_zoom(value, zoom, 0);
-    }
     /* centrado no espaco abaixo do titulo */
     lv_obj_align(value, LV_ALIGN_CENTER, 0, 18);
 
@@ -180,13 +175,13 @@ static void create_page_dashboard(lv_obj_t *page)
     const lv_coord_t tile_h = (LV_VER_RES - HEADER_H - TABBAR_H - 2 * 12 - 12) / 2;
 
     lv_obj_t *t;
-    t = make_big_tile(page, "Temperatura", COL_TEMP, "°C", 512, &s_temp_value);
+    t = make_big_tile(page, "Temperatura", COL_TEMP, "°C", &dewview_font_96, &s_temp_value);
     lv_obj_set_size(t, tile_w, tile_h);
-    t = make_big_tile(page, "Ponto de Orvalho", COL_DEW, "°C", 512, &s_dew_value);
+    t = make_big_tile(page, "Ponto de Orvalho", COL_DEW, "°C", &dewview_font_96, &s_dew_value);
     lv_obj_set_size(t, tile_w, tile_h);
-    t = make_big_tile(page, "Humidade", COL_RH, "% HR", 384, &s_rh_value);
+    t = make_big_tile(page, "Humidade", COL_RH, "% HR", &dewview_font_96, &s_rh_value);
     lv_obj_set_size(t, tile_w, tile_h);
-    t = make_big_tile(page, "Margem T - Td", COL_TEXT_MUTED, "°C", 384, &s_margin_value);
+    t = make_big_tile(page, "Margem T - Td", COL_TEXT_MUTED, "°C", &dewview_font_96, &s_margin_value);
     lv_obj_set_size(t, tile_w, tile_h);
 
     /* Selo de estado no cartao da margem */
@@ -208,12 +203,17 @@ static void create_page_dashboard(lv_obj_t *page)
 
 /*=========================== Pagina 2: Graficos ===========================*/
 
-static lv_obj_t *make_chart(lv_obj_t *card, lv_coord_t h)
+/*
+ * As etiquetas do eixo Y sao desenhadas pelo LVGL a esquerda do gafico,
+ * FORA do objeto (lv_chart draw_y_ticks usa coords.x1). O grafico e por isso
+ * encolhido em `w` e alinhado a direita, deixando espaco para a escala
+ * dentro do cartao (senao o cartao corta as etiquetas).
+ */
+static lv_obj_t *make_chart(lv_obj_t *card, lv_coord_t w, lv_coord_t h)
 {
     lv_obj_t *chart = lv_chart_create(card);
-    lv_obj_set_size(chart, LV_PCT(100), h);
-    lv_obj_align(chart, LV_ALIGN_BOTTOM_MID, 0, 0);
-    lv_obj_set_style_pad_left(chart, 44, 0);   // espaco para os ticks do eixo Y
+    lv_obj_set_size(chart, w, h);
+    lv_obj_align(chart, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
     lv_obj_set_style_bg_opa(chart, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(chart, 0, 0);
     lv_obj_set_style_line_color(chart, COL_GRID, LV_PART_MAIN);   // grelha recessiva
@@ -241,6 +241,9 @@ static void create_page_charts(lv_obj_t *page)
     const lv_coord_t avail_h = LV_VER_RES - HEADER_H - TABBAR_H - 2 * 12 - 12;
     const lv_coord_t card_td_h = (avail_h * 3) / 5;
     const lv_coord_t card_rh_h = avail_h - card_td_h;
+    /* largura do grafico: pagina - pad da pagina (2x12) - pad do cartao (2x12)
+     * - 44 px reservados para as etiquetas do eixo Y */
+    const lv_coord_t chart_w = LV_HOR_RES - 2 * 12 - 2 * 12 - 44;
 
     /* Temperatura + ponto de orvalho (mesmo eixo, degC) */
     lv_obj_t *card_td = make_card(page);
@@ -266,7 +269,7 @@ static void create_page_charts(lv_obj_t *page)
     lv_obj_set_style_border_width(spacer, 0, 0);
     make_legend_entry(legend, "Ponto de orvalho (°C)", COL_DEW);
 
-    s_chart_td = make_chart(card_td, card_td_h - 24 - 24 - 8);
+    s_chart_td = make_chart(card_td, chart_w, card_td_h - 24 - 24 - 8);
     lv_chart_set_range(s_chart_td, LV_CHART_AXIS_PRIMARY_Y, TO_TENTHS(-10), TO_TENTHS(40));
     s_ser_temp = lv_chart_add_series(s_chart_td, COL_TEMP, LV_CHART_AXIS_PRIMARY_Y);
     s_ser_dew  = lv_chart_add_series(s_chart_td, COL_DEW, LV_CHART_AXIS_PRIMARY_Y);
@@ -285,7 +288,7 @@ static void create_page_charts(lv_obj_t *page)
     lv_obj_set_style_text_color(rh_title, COL_TEXT_2, 0);
     lv_obj_align(rh_title, LV_ALIGN_TOP_LEFT, 0, 0);
 
-    s_chart_rh = make_chart(card_rh, card_rh_h - 24 - 24 - 8);
+    s_chart_rh = make_chart(card_rh, chart_w, card_rh_h - 24 - 24 - 8);
     lv_chart_set_range(s_chart_rh, LV_CHART_AXIS_PRIMARY_Y, 0, TO_TENTHS(100));
     s_ser_rh = lv_chart_add_series(s_chart_rh, COL_RH, LV_CHART_AXIS_PRIMARY_Y);
     lv_chart_set_all_value(s_chart_rh, s_ser_rh, LV_CHART_POINT_NONE);
