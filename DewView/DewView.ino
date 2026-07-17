@@ -17,6 +17,7 @@
 #include "s24_modbus.h"
 #include "dewview_ui.h"
 #include "dewview_net.h"
+#include "dewview_lang.h"
 
 #include <WiFi.h>
 
@@ -60,7 +61,7 @@ static bool scan_step()
 
     if (addr == 1) {  // novo grupo baud/paridade: atualiza o estado no ecra
         static char status[48];
-        snprintf(status, sizeof(status), "A procurar sensor: %lu %s...",
+        snprintf(status, sizeof(status), dew_tr()->scanning_fmt,
                  (unsigned long)baud, SCAN_CONFIG_NAMES[cfg_i]);
         lvgl_port_lock(-1);
         dewview_ui_set_status(status, false);
@@ -69,7 +70,7 @@ static bool scan_step()
 
     if (s_sensor.probe(baud, SCAN_SERIAL_CONFIGS[cfg_i], addr, SCAN_PROBE_TIMEOUT_MS)) {
         static char msg[64];
-        snprintf(msg, sizeof(msg), "Sensor encontrado: %lu %s addr %u",
+        snprintf(msg, sizeof(msg), dew_tr()->log_found_fmt,
                  (unsigned long)baud, SCAN_CONFIG_NAMES[cfg_i], addr);
         Serial.println(msg);
         lvgl_port_lock(-1);
@@ -86,6 +87,7 @@ void setup()
     Serial.begin(115200);
 
     Serial.println("DewView v" DEWVIEW_VERSION " - " DEWVIEW_DEVELOPER);
+    dew_lang_load();
     Serial.println("DewView: inicializar placa");
     Board *board = new Board();
     board->init();
@@ -107,7 +109,7 @@ void setup()
 
     lvgl_port_lock(-1);
     dewview_ui_create();
-    dewview_ui_log("Arranque");
+    dewview_ui_log(dew_tr()->log_boot);
     lvgl_port_unlock();
 
     /* AP "DewView" + servidor web + OTA (e STA para o gateway no modo TCP) */
@@ -115,7 +117,7 @@ void setup()
 
 #if DEWVIEW_MODBUS_MODE == DEWVIEW_MODBUS_TCP
     lvgl_port_lock(-1);
-    dewview_ui_set_status("A ligar WiFi...", false);
+    dewview_ui_set_status(dew_tr()->connecting_wifi, false);
     lvgl_port_unlock();
 #endif
 
@@ -135,7 +137,7 @@ void loop()
 #if DEWVIEW_MODBUS_MODE == DEWVIEW_MODBUS_TCP
     if (WiFi.status() != WL_CONNECTED) {
         lvgl_port_lock(-1);
-        dewview_ui_set_status("A ligar WiFi...", false);
+        dewview_ui_set_status(dew_tr()->connecting_wifi, false);
         lvgl_port_unlock();
         delay(100);
         return;
@@ -153,8 +155,8 @@ void loop()
             s_sensor.setParams(DEWVIEW_RS485_BAUD, DEWVIEW_RS485_CONFIG,
                                DEWVIEW_MODBUS_UNIT_ID);
             lvgl_port_lock(-1);
-            dewview_ui_log("Procura sem resposta: verificar cablagem");
-            dewview_ui_set_status("Sensor nao encontrado", false);
+            dewview_ui_log(dew_tr()->log_scan_failed);
+            dewview_ui_set_status(dew_tr()->sensor_not_found, false);
             lvgl_port_unlock();
         }
         return;
@@ -163,7 +165,7 @@ void loop()
         s_scan_active = true;
         s_scan_idx = 0;
         lvgl_port_lock(-1);
-        dewview_ui_log("A procurar sensor no barramento...");
+        dewview_ui_log(dew_tr()->log_scan_start);
         lvgl_port_unlock();
         return;
     }
@@ -182,20 +184,20 @@ void loop()
     lvgl_port_lock(-1);
     if (ok) {
         if (s_failures >= STALE_AFTER_FAILURES) {
-            dewview_ui_log("Sensor recuperado");
+            dewview_ui_log(dew_tr()->log_recovered);
         }
         s_failures = 0;
         s_ok_count++;
         dewview_ui_update(reading);
+        static char status[48];
 #if DEWVIEW_MODBUS_MODE == DEWVIEW_MODBUS_TCP
-        static char status[48];
-        snprintf(status, sizeof(status), "Sensor OK  |  %s", WiFi.localIP().toString().c_str());
-        dewview_ui_set_status(status, true);
+        snprintf(status, sizeof(status), dew_tr()->sensor_ok_sta_fmt,
+                 WiFi.localIP().toString().c_str());
 #else
-        static char status[48];
-        snprintf(status, sizeof(status), "Sensor OK  |  AP %s", WiFi.softAPIP().toString().c_str());
-        dewview_ui_set_status(status, true);
+        snprintf(status, sizeof(status), dew_tr()->sensor_ok_ap_fmt,
+                 WiFi.softAPIP().toString().c_str());
 #endif
+        dewview_ui_set_status(status, true);
         Serial.printf("T=%.1fC  Td=%.1fC  HR=%.1f%%\n",
                       reading.tempC, reading.dewC, reading.humidity);
     } else {
@@ -205,7 +207,7 @@ void loop()
         if (s_failures == STALE_AFTER_FAILURES) {
             dewview_ui_set_stale();
             static char logmsg[64];
-            snprintf(logmsg, sizeof(logmsg), "Sensor sem resposta (%s)", s_sensor.lastError());
+            snprintf(logmsg, sizeof(logmsg), dew_tr()->log_no_response_fmt, s_sensor.lastError());
             dewview_ui_log(logmsg);
         }
         Serial.printf("DewView: leitura falhou (%s) %s\n",
