@@ -93,7 +93,10 @@
 
     /* For refresh panel (RGB) */
 #if ESP_PANEL_USE_1024_600_LCD
-    #define ESP_PANEL_BOARD_LCD_RGB_CLK_HZ            (21 * 1000 * 1000)
+    /* 18 MHz em vez dos 21 MHz originais: reduz a pressao na largura de
+     * banda da PSRAM e evita o "screen drift" quando o WiFi esta ativo
+     * (refresh ~21 fps em vez de ~24 fps, impercetivel nesta UI). */
+    #define ESP_PANEL_BOARD_LCD_RGB_CLK_HZ            (18 * 1000 * 1000)
     #define ESP_PANEL_BOARD_LCD_RGB_HPW               (30)
     #define ESP_PANEL_BOARD_LCD_RGB_HBP               (145)
     #define ESP_PANEL_BOARD_LCD_RGB_HFP               (170)
@@ -118,7 +121,10 @@
     #define ESP_PANEL_BOARD_LCD_RGB_PIXEL_BITS      (ESP_PANEL_LCD_COLOR_BITS_RGB565)   // | ESP_PANEL_LCD_COLOR_BITS_RGB565 | ESP_PANEL_LCD_COLOR_BITS_RGB888 |
                                                                                         // ┗---------------------------------┻---------------------------------┛
                                                             // To understand color format of RGB LCD, see: https://docs.espressif.com/projects/esp-iot-solution/en/latest/display/lcd/rgb_lcd.html#color-formats
-    #define ESP_PANEL_BOARD_LCD_RGB_BOUNCE_BUF_SIZE (ESP_PANEL_BOARD_WIDTH * 10)
+    #define ESP_PANEL_BOARD_LCD_RGB_BOUNCE_BUF_SIZE (ESP_PANEL_BOARD_WIDTH * 20)
+                                                            // *20 (em vez do tipico *10) para absorver os picos de
+                                                            // trafego PSRAM do WiFi e evitar o drift do ecra.
+                                                            // 1024*600/(1024*20) = 30 (N par, como exigido).
                                                             // Bounce buffer size in bytes. It is used to avoid screen drift
                                                             // for ESP32-S3. Typically set to `ESP_PANEL_BOARD_WIDTH * 10`
                                                             // The size should satisfy `size * N = LCD_width * LCD_height`,
