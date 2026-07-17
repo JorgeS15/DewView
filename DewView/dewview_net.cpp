@@ -12,6 +12,16 @@ static S24Reading s_last_reading = {};
 static bool s_last_ok = false;
 static volatile bool s_ota_busy = false;
 
+/* Historico circular das ultimas leituras, para exportacao em CSV */
+struct Sample {
+    uint32_t ms;      // uptime da leitura
+    float tempC, dewC, humidity;
+};
+static constexpr uint16_t HIST_MAX = 600;   // = pontos dos graficos (~5 min a 2 Hz)
+static Sample s_hist[HIST_MAX];
+static uint16_t s_hist_len = 0;
+static uint16_t s_hist_next = 0;
+
 /*------------------------------ Paginas web ------------------------------*/
 
 /* Cabeca comum (CSS com a mesma paleta do ecra). Fora do snprintf para nao
@@ -101,6 +111,9 @@ static void handle_root()
              "<div class=\"card h\"><h2>Humidade</h2><p class=\"v\">%s <small>%%HR</small></p></div>"
              "<div class=\"card\"><h2>Margem T&minus;Td</h2><p class=\"v\">%s <small>&deg;C</small></p>"
              "<span class=\"badge\" style=\"background:%s\">%s</span></div>"
+             "<div class=\"card\" style=\"display:flex;align-items:center\">"
+             "<a class=\"btn\" style=\"text-align:center;text-decoration:none\" "
+             "href=\"/data.csv\" download>Exportar CSV (ultimos 5 min)</a></div>"
              "</main>"
              /* auto-refresh so na pagina de estado (JS para nao afetar /update) */
              "<script>setTimeout(()=>location.reload(),5000)</script>",
@@ -200,6 +213,34 @@ static void handle_update_upload()
     }
 }
 
+/* Exporta o historico como CSV (separador ';', decimais '.').
+ * uptime_s e o instante da leitura em segundos desde o arranque. */
+static void handle_data_csv()
+{
+    s_server.sendHeader("Content-Disposition", "attachment; filename=dewview.csv");
+    s_server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    s_server.send(200, "text/csv", "");
+    s_server.sendContent("uptime_s;temperatura_C;ponto_orvalho_C;humidade_pctHR\r\n");
+
+    char chunk[1024];
+    size_t used = 0;
+    const uint16_t start = (s_hist_next + HIST_MAX - s_hist_len) % HIST_MAX;
+    for (uint16_t i = 0; i < s_hist_len; i++) {
+        const Sample &sm = s_hist[(start + i) % HIST_MAX];
+        used += snprintf(chunk + used, sizeof(chunk) - used, "%lu.%03lu;%.1f;%.1f;%.1f\r\n",
+                         (unsigned long)(sm.ms / 1000), (unsigned long)(sm.ms % 1000),
+                         sm.tempC, sm.dewC, sm.humidity);
+        if (used > sizeof(chunk) - 48) {
+            s_server.sendContent(chunk, used);
+            used = 0;
+        }
+    }
+    if (used > 0) {
+        s_server.sendContent(chunk, used);
+    }
+    s_server.sendContent("");
+}
+
 /*--------------------------------- API -----------------------------------*/
 
 void dewview_net_begin()
@@ -221,6 +262,7 @@ void dewview_net_begin()
     }
 
     s_server.on("/", HTTP_GET, handle_root);
+    s_server.on("/data.csv", HTTP_GET, handle_data_csv);
     s_server.on("/update", HTTP_GET, handle_update_form);
     s_server.on("/update", HTTP_POST, handle_update_done, handle_update_upload);
     s_server.onNotFound([]() {
@@ -256,6 +298,14 @@ void dewview_net_set_reading(const S24Reading &reading, bool ok)
 {
     s_last_reading = reading;
     s_last_ok = ok;
+
+    if (ok) {
+        s_hist[s_hist_next] = {millis(), reading.tempC, reading.dewC, reading.humidity};
+        s_hist_next = (s_hist_next + 1) % HIST_MAX;
+        if (s_hist_len < HIST_MAX) {
+            s_hist_len++;
+        }
+    }
 }
 
 bool dewview_net_ota_busy()

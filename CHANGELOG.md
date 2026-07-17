@@ -5,6 +5,18 @@ ativa está definida em `DewView/dewview_config.h` (`DEWVIEW_VERSION`) e é
 mostrada no ecrã (cabeçalho e página Sistema), na página web e no arranque
 do monitor série.
 
+## v1.1.7 — 2026-07-16
+
+### Novidades
+
+- **Tradução PT/EN**: novo botão no cabeçalho do ecrã que comuta toda a
+  interface entre português e inglês. A escolha fica guardada em NVS e
+  sobrevive a reinícios.
+- **Exportação CSV**: botão "Exportar CSV" na página web (e endpoint
+  `/data.csv`) que descarrega as últimas leituras (~5 min a 2 Hz) com
+  colunas `uptime_s;temperatura_C;ponto_orvalho_C;humidade_pctHR`
+  (separador `;`, decimais `.`).
+
 ## v1.1.6 — 2026-07-16
 
 ### Correções

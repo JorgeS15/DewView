@@ -3,6 +3,7 @@
 #include <esp_heap_caps.h>
 #include "dewview_ui.h"
 #include "dewview_config.h"
+#include "dewview_lang.h"
 
 /*================================ Paleta ==================================*/
 /* Superficie escura; series validadas para CVD (laranja/azul). */
@@ -50,8 +51,12 @@ LV_FONT_DECLARE(dewview_font_96);
 /* Cabecalho */
 static lv_obj_t *s_status_led;
 static lv_obj_t *s_status_label;
+static lv_obj_t *s_subtitle;
+static lv_obj_t *s_lang_btn_label;
+static lv_obj_t *s_tabview;
 
 /* Pagina 1: Painel */
+static lv_obj_t *s_tile_titles[4];
 static lv_obj_t *s_temp_value;
 static lv_obj_t *s_dew_value;
 static lv_obj_t *s_rh_value;
@@ -60,6 +65,9 @@ static lv_obj_t *s_margin_badge;
 static lv_obj_t *s_margin_badge_label;
 
 /* Pagina 2: Graficos */
+static lv_obj_t *s_legend_temp;
+static lv_obj_t *s_legend_dew;
+static lv_obj_t *s_rh_title;
 static lv_obj_t *s_chart_td;
 static lv_chart_series_t *s_ser_temp;
 static lv_chart_series_t *s_ser_dew;
@@ -67,6 +75,7 @@ static lv_obj_t *s_chart_rh;
 static lv_chart_series_t *s_ser_rh;
 
 /* Pagina 3: Sistema */
+static lv_obj_t *s_diag_titles[4];
 static lv_obj_t *s_diag_sys;
 static lv_obj_t *s_diag_net;
 static lv_obj_t *s_diag_modbus;
@@ -111,7 +120,7 @@ static lv_obj_t *make_card(lv_obj_t *parent)
     return card;
 }
 
-static void make_legend_entry(lv_obj_t *parent, const char *text, lv_color_t color)
+static lv_obj_t *make_legend_entry(lv_obj_t *parent, const char *text, lv_color_t color)
 {
     lv_obj_t *dot = lv_obj_create(parent);
     lv_obj_set_size(dot, 12, 12);
@@ -123,6 +132,7 @@ static void make_legend_entry(lv_obj_t *parent, const char *text, lv_color_t col
     lv_label_set_text(lbl, text);
     lv_obj_set_style_text_font(lbl, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(lbl, COL_TEXT_2, 0);
+    return lbl;
 }
 
 /*============================ Pagina 1: Painel ============================*/
@@ -130,7 +140,7 @@ static void make_legend_entry(lv_obj_t *parent, const char *text, lv_color_t col
 /* Cartao grande 2x2 com o valor em fonte dedicada, legivel a distancia. */
 static lv_obj_t *make_big_tile(lv_obj_t *parent, const char *title, lv_color_t accent,
                                const char *unit, const lv_font_t *value_font,
-                               lv_obj_t **value_out)
+                               lv_obj_t **value_out, lv_obj_t **title_out)
 {
     lv_obj_t *card = make_card(parent);
 
@@ -146,6 +156,7 @@ static lv_obj_t *make_big_tile(lv_obj_t *parent, const char *title, lv_color_t a
     lv_obj_set_style_text_font(label, &DEW_FONT_UNIT, 0);
     lv_obj_set_style_text_color(label, COL_TEXT_2, 0);
     lv_obj_align(label, LV_ALIGN_TOP_LEFT, 8, 0);
+    *title_out = label;
 
     lv_obj_t *unit_lbl = lv_label_create(card);
     lv_label_set_text(unit_lbl, unit);
@@ -174,14 +185,19 @@ static void create_page_dashboard(lv_obj_t *page)
     const lv_coord_t tile_w = (LV_HOR_RES - 2 * 12 - 12) / 2;
     const lv_coord_t tile_h = (LV_VER_RES - HEADER_H - TABBAR_H - 2 * 12 - 12) / 2;
 
+    const DewStrings *tr = dew_tr();
     lv_obj_t *t;
-    t = make_big_tile(page, "Temperatura", COL_TEMP, "°C", &dewview_font_96, &s_temp_value);
+    t = make_big_tile(page, tr->temperature, COL_TEMP, "°C", &dewview_font_96,
+                      &s_temp_value, &s_tile_titles[0]);
     lv_obj_set_size(t, tile_w, tile_h);
-    t = make_big_tile(page, "Ponto de Orvalho", COL_DEW, "°C", &dewview_font_96, &s_dew_value);
+    t = make_big_tile(page, tr->dew_point, COL_DEW, "°C", &dewview_font_96,
+                      &s_dew_value, &s_tile_titles[1]);
     lv_obj_set_size(t, tile_w, tile_h);
-    t = make_big_tile(page, "Humidade", COL_RH, "% HR", &dewview_font_96, &s_rh_value);
+    t = make_big_tile(page, tr->humidity, COL_RH, "% HR", &dewview_font_96,
+                      &s_rh_value, &s_tile_titles[2]);
     lv_obj_set_size(t, tile_w, tile_h);
-    t = make_big_tile(page, "Margem T - Td", COL_TEXT_MUTED, "°C", &dewview_font_96, &s_margin_value);
+    t = make_big_tile(page, tr->margin, COL_TEXT_MUTED, "°C", &dewview_font_96,
+                      &s_margin_value, &s_tile_titles[3]);
     lv_obj_set_size(t, tile_w, tile_h);
 
     /* Selo de estado no cartao da margem */
@@ -262,12 +278,12 @@ static void create_page_charts(lv_obj_t *page)
     lv_obj_set_flex_align(legend, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_clear_flag(legend, LV_OBJ_FLAG_SCROLLABLE);
 
-    make_legend_entry(legend, "Temperatura (°C)", COL_TEMP);
+    s_legend_temp = make_legend_entry(legend, dew_tr()->legend_temp, COL_TEMP);
     lv_obj_t *spacer = lv_obj_create(legend);
     lv_obj_set_size(spacer, 12, 1);
     lv_obj_set_style_bg_opa(spacer, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(spacer, 0, 0);
-    make_legend_entry(legend, "Ponto de orvalho (°C)", COL_DEW);
+    s_legend_dew = make_legend_entry(legend, dew_tr()->legend_dew, COL_DEW);
 
     s_chart_td = make_chart(card_td, chart_w, card_td_h - 24 - 24 - 8);
     lv_chart_set_range(s_chart_td, LV_CHART_AXIS_PRIMARY_Y, TO_TENTHS(-10), TO_TENTHS(40));
@@ -283,7 +299,8 @@ static void create_page_charts(lv_obj_t *page)
     lv_obj_align(card_rh, LV_ALIGN_TOP_MID, 0, card_td_h + 12);
 
     lv_obj_t *rh_title = lv_label_create(card_rh);
-    lv_label_set_text(rh_title, "Humidade (% HR)");
+    s_rh_title = rh_title;
+    lv_label_set_text(rh_title, dew_tr()->rh_chart_title);
     lv_obj_set_style_text_font(rh_title, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(rh_title, COL_TEXT_2, 0);
     lv_obj_align(rh_title, LV_ALIGN_TOP_LEFT, 0, 0);
@@ -352,20 +369,25 @@ static void create_page_diag(lv_obj_t *page)
     const lv_coord_t tile_w = (LV_HOR_RES - 2 * 12 - 12) / 2;
     const lv_coord_t tile_h = (LV_VER_RES - HEADER_H - TABBAR_H - 2 * 12 - 12) / 2;
 
+    const DewStrings *tr = dew_tr();
     lv_obj_t *c;
-    c = make_diag_card(page, "Sistema", &s_diag_sys);
+    c = make_diag_card(page, tr->card_system, &s_diag_sys);
     lv_obj_set_size(c, tile_w, tile_h);
-    c = make_diag_card(page, "Rede", &s_diag_net);
+    s_diag_titles[0] = lv_obj_get_child(c, 0);
+    c = make_diag_card(page, tr->card_network, &s_diag_net);
     lv_obj_set_size(c, tile_w, tile_h);
-    c = make_diag_card(page, "Modbus", &s_diag_modbus);
+    s_diag_titles[1] = lv_obj_get_child(c, 0);
+    c = make_diag_card(page, tr->card_modbus, &s_diag_modbus);
     lv_obj_set_size(c, tile_w, tile_h);
+    s_diag_titles[2] = lv_obj_get_child(c, 0);
 
     /* Registo de eventos (com scroll por toque) */
-    c = make_diag_card(page, "Eventos", &s_diag_log);
+    c = make_diag_card(page, tr->card_events, &s_diag_log);
     lv_obj_set_size(c, tile_w, tile_h);
+    s_diag_titles[3] = lv_obj_get_child(c, 0);
     lv_obj_add_flag(c, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_scroll_dir(c, LV_DIR_VER);
-    lv_label_set_text(s_diag_log, "(sem eventos)");
+    lv_label_set_text(s_diag_log, tr->no_events);
 }
 
 void dewview_ui_diag_update(uint32_t ok_count, uint32_t fail_count,
@@ -374,14 +396,9 @@ void dewview_ui_diag_update(uint32_t ok_count, uint32_t fail_count,
     char uptime[32];
     format_uptime(uptime, sizeof(uptime));
 
+    const DewStrings *tr = dew_tr();
     char buf[320];
-    snprintf(buf, sizeof(buf),
-             "Firmware: DewView v" DEWVIEW_VERSION " (%s %s)\n"
-             "Desenvolvedor: " DEWVIEW_DEVELOPER "\n"
-             "Uptime: %s\n"
-             "Heap livre: %u KB (min %u KB)\n"
-             "PSRAM livre: %u KB\n"
-             "Ecra: %dx%d",
+    snprintf(buf, sizeof(buf), tr->sys_fmt,
              __DATE__, __TIME__, uptime,
              (unsigned)(esp_get_free_heap_size() / 1024),
              (unsigned)(esp_get_minimum_free_heap_size() / 1024),
@@ -390,30 +407,19 @@ void dewview_ui_diag_update(uint32_t ok_count, uint32_t fail_count,
     lv_label_set_text(s_diag_sys, buf);
 
 #if DEWVIEW_MODBUS_MODE == DEWVIEW_MODBUS_TCP
-    snprintf(buf, sizeof(buf),
-             "AP: %s (%s)\n"
-             "Clientes no AP: %d\n"
-             "STA: %s (%s)\n"
-             "OTA: /update ou porta de rede",
+    snprintf(buf, sizeof(buf), tr->net_fmt_sta,
              DEWVIEW_AP_SSID, WiFi.softAPIP().toString().c_str(),
              WiFi.softAPgetStationNum(),
-             WiFi.status() == WL_CONNECTED ? "ligado" : "desligado",
+             WiFi.status() == WL_CONNECTED ? "ON" : "OFF",
              WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString().c_str() : "-");
 #else
-    snprintf(buf, sizeof(buf),
-             "AP: %s (%s)\n"
-             "Clientes no AP: %d\n"
-             "OTA: /update ou porta de rede",
+    snprintf(buf, sizeof(buf), tr->net_fmt,
              DEWVIEW_AP_SSID, WiFi.softAPIP().toString().c_str(),
              WiFi.softAPgetStationNum());
 #endif
     lv_label_set_text(s_diag_net, buf);
 
-    snprintf(buf, sizeof(buf),
-             "Modo: %s\n"
-             "Leituras OK: %lu\n"
-             "Falhas: %lu\n"
-             "Ultimo erro: %s",
+    snprintf(buf, sizeof(buf), tr->modbus_fmt,
              modbus_desc,
              (unsigned long)ok_count, (unsigned long)fail_count,
              (last_error && last_error[0]) ? last_error : "-");
@@ -437,6 +443,48 @@ void dewview_ui_log(const char *msg)
     strncpy(s_log_buf, merged, sizeof(s_log_buf) - 1);
     s_log_buf[sizeof(s_log_buf) - 1] = '\0';
     lv_label_set_text(s_diag_log, s_log_buf);
+}
+
+/*============================== Lingua PT/EN ==============================*/
+
+/* Reaplica os textos estaticos na lingua ativa (os dinamicos - estado,
+ * selo, diagnostico - sao reconstruidos no ciclo de leitura seguinte). */
+static void apply_language()
+{
+    const DewStrings *tr = dew_tr();
+
+    lv_label_set_text(s_subtitle, tr->subtitle);
+    lv_label_set_text(s_lang_btn_label, dew_lang_is_pt() ? "EN" : "PT");
+
+    lv_label_set_text(s_tile_titles[0], tr->temperature);
+    lv_label_set_text(s_tile_titles[1], tr->dew_point);
+    lv_label_set_text(s_tile_titles[2], tr->humidity);
+    lv_label_set_text(s_tile_titles[3], tr->margin);
+
+    lv_label_set_text(s_legend_temp, tr->legend_temp);
+    lv_label_set_text(s_legend_dew, tr->legend_dew);
+    lv_label_set_text(s_rh_title, tr->rh_chart_title);
+
+    lv_label_set_text(s_diag_titles[0], tr->card_system);
+    lv_label_set_text(s_diag_titles[1], tr->card_network);
+    lv_label_set_text(s_diag_titles[2], tr->card_modbus);
+    lv_label_set_text(s_diag_titles[3], tr->card_events);
+
+    char tab_name[40];
+    snprintf(tab_name, sizeof(tab_name), LV_SYMBOL_HOME "  %s", tr->tab_panel);
+    lv_tabview_rename_tab(s_tabview, 0, tab_name);
+    snprintf(tab_name, sizeof(tab_name), LV_SYMBOL_IMAGE "  %s", tr->tab_charts);
+    lv_tabview_rename_tab(s_tabview, 1, tab_name);
+    snprintf(tab_name, sizeof(tab_name), LV_SYMBOL_SETTINGS "  %s", tr->tab_system);
+    lv_tabview_rename_tab(s_tabview, 2, tab_name);
+}
+
+/* Corre no task do LVGL (ja com o mutex adquirido) */
+static void lang_btn_event_cb(lv_event_t *e)
+{
+    (void)e;
+    dew_lang_toggle();
+    apply_language();
 }
 
 /*============================ Construcao geral ============================*/
@@ -464,11 +512,27 @@ void dewview_ui_create()
     lv_obj_set_style_text_color(title, COL_TEXT, 0);
     lv_obj_align(title, LV_ALIGN_LEFT_MID, 0, 0);
 
-    lv_obj_t *subtitle = lv_label_create(header);
-    lv_label_set_text(subtitle, "Sensor S24  -  Ponto de Orvalho  |  v" DEWVIEW_VERSION);
-    lv_obj_set_style_text_font(subtitle, &lv_font_montserrat_14, 0);
-    lv_obj_set_style_text_color(subtitle, COL_TEXT_MUTED, 0);
-    lv_obj_align_to(subtitle, title, LV_ALIGN_OUT_RIGHT_MID, 16, 2);
+    s_subtitle = lv_label_create(header);
+    lv_label_set_text(s_subtitle, dew_tr()->subtitle);
+    lv_obj_set_style_text_font(s_subtitle, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(s_subtitle, COL_TEXT_MUTED, 0);
+    lv_obj_align_to(s_subtitle, title, LV_ALIGN_OUT_RIGHT_MID, 16, 2);
+
+    /* Botao PT/EN (mostra a lingua para a qual comuta) */
+    lv_obj_t *lang_btn = lv_btn_create(header);
+    lv_obj_set_size(lang_btn, 64, 36);
+    lv_obj_align(lang_btn, LV_ALIGN_RIGHT_MID, -300, 0);
+    lv_obj_set_style_bg_color(lang_btn, COL_BG, 0);
+    lv_obj_set_style_radius(lang_btn, 8, 0);
+    lv_obj_set_style_border_width(lang_btn, 1, 0);
+    lv_obj_set_style_border_color(lang_btn, COL_TEXT_MUTED, 0);
+    lv_obj_add_event_cb(lang_btn, lang_btn_event_cb, LV_EVENT_CLICKED, NULL);
+
+    s_lang_btn_label = lv_label_create(lang_btn);
+    lv_label_set_text(s_lang_btn_label, dew_lang_is_pt() ? "EN" : "PT");
+    lv_obj_set_style_text_font(s_lang_btn_label, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_color(s_lang_btn_label, COL_TEXT_2, 0);
+    lv_obj_center(s_lang_btn_label);
 
     s_status_led = lv_obj_create(header);
     lv_obj_set_size(s_status_led, 12, 12);
@@ -478,7 +542,7 @@ void dewview_ui_create()
     lv_obj_align(s_status_led, LV_ALIGN_RIGHT_MID, -260, 0);
 
     s_status_label = lv_label_create(header);
-    lv_label_set_text(s_status_label, "A iniciar...");
+    lv_label_set_text(s_status_label, dew_tr()->starting);
     lv_obj_set_style_text_font(s_status_label, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(s_status_label, COL_TEXT_2, 0);
     lv_obj_align(s_status_label, LV_ALIGN_RIGHT_MID, 0, 0);
@@ -488,6 +552,7 @@ void dewview_ui_create()
 
     /*-------------------------- Separadores (tabs) -----------------------*/
     lv_obj_t *tabview = lv_tabview_create(scr, LV_DIR_BOTTOM, TABBAR_H);
+    s_tabview = tabview;
     lv_obj_set_size(tabview, LV_PCT(100), LV_VER_RES - HEADER_H);
     lv_obj_align(tabview, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_obj_set_style_bg_color(tabview, COL_BG, 0);
@@ -502,9 +567,13 @@ void dewview_ui_create()
     lv_obj_set_style_border_width(tab_btns, 3, LV_PART_ITEMS | LV_STATE_CHECKED);
     lv_obj_set_style_border_side(tab_btns, LV_BORDER_SIDE_TOP, LV_PART_ITEMS | LV_STATE_CHECKED);
 
-    lv_obj_t *tab1 = lv_tabview_add_tab(tabview, LV_SYMBOL_HOME "  Painel");
-    lv_obj_t *tab2 = lv_tabview_add_tab(tabview, LV_SYMBOL_IMAGE "  Graficos");
-    lv_obj_t *tab3 = lv_tabview_add_tab(tabview, LV_SYMBOL_SETTINGS "  Sistema");
+    char tab_name[40];
+    snprintf(tab_name, sizeof(tab_name), LV_SYMBOL_HOME "  %s", dew_tr()->tab_panel);
+    lv_obj_t *tab1 = lv_tabview_add_tab(tabview, tab_name);
+    snprintf(tab_name, sizeof(tab_name), LV_SYMBOL_IMAGE "  %s", dew_tr()->tab_charts);
+    lv_obj_t *tab2 = lv_tabview_add_tab(tabview, tab_name);
+    snprintf(tab_name, sizeof(tab_name), LV_SYMBOL_SETTINGS "  %s", dew_tr()->tab_system);
+    lv_obj_t *tab3 = lv_tabview_add_tab(tabview, tab_name);
 
     create_page_dashboard(tab1);
     create_page_charts(tab2);
@@ -522,16 +591,18 @@ void dewview_ui_update(const S24Reading &reading)
     set_value_label(s_rh_value, reading.humidity);
     set_value_label(s_margin_value, margin);
 
+    char badge[40];
     if (margin >= DEWVIEW_MARGIN_OK) {
         lv_obj_set_style_bg_color(s_margin_badge, COL_OK, 0);
-        lv_label_set_text(s_margin_badge_label, LV_SYMBOL_OK " Seguro");
+        snprintf(badge, sizeof(badge), LV_SYMBOL_OK " %s", dew_tr()->safe);
     } else if (margin >= DEWVIEW_MARGIN_WARN) {
         lv_obj_set_style_bg_color(s_margin_badge, COL_WARN, 0);
-        lv_label_set_text(s_margin_badge_label, LV_SYMBOL_WARNING " Alerta");
+        snprintf(badge, sizeof(badge), LV_SYMBOL_WARNING " %s", dew_tr()->warning);
     } else {
         lv_obj_set_style_bg_color(s_margin_badge, COL_CRIT, 0);
-        lv_label_set_text(s_margin_badge_label, LV_SYMBOL_WARNING " Risco");
+        snprintf(badge, sizeof(badge), LV_SYMBOL_WARNING " %s", dew_tr()->risk);
     }
+    lv_label_set_text(s_margin_badge_label, badge);
 
     lv_chart_set_next_value(s_chart_td, s_ser_temp, TO_TENTHS(reading.tempC));
     lv_chart_set_next_value(s_chart_td, s_ser_dew, TO_TENTHS(reading.dewC));
@@ -546,7 +617,9 @@ void dewview_ui_set_stale()
     lv_label_set_text(s_rh_value, "--");
     lv_label_set_text(s_margin_value, "--");
     lv_obj_set_style_bg_color(s_margin_badge, COL_WARN, 0);
-    lv_label_set_text(s_margin_badge_label, LV_SYMBOL_WARNING " Sem dados");
+    char badge[40];
+    snprintf(badge, sizeof(badge), LV_SYMBOL_WARNING " %s", dew_tr()->no_data);
+    lv_label_set_text(s_margin_badge_label, badge);
 }
 
 void dewview_ui_set_status(const char *text, bool ok)
