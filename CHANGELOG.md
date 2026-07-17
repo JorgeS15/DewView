@@ -5,6 +5,18 @@ ativa está definida em `DewView/dewview_config.h` (`DEWVIEW_VERSION`) e é
 mostrada no ecrã (cabeçalho e página Sistema), na página web e no arranque
 do monitor série.
 
+## v1.1.8 — 2026-07-17
+
+### Corrigido
+
+- **Imagem a "deslizar" verticalmente (screen drift)**: nos painéis RGB o
+  ESP32-S3 transmite os píxeis continuamente a partir da PSRAM; quando o
+  WiFi disputa a largura de banda, o sincronismo escorrega e a imagem
+  desloca-se. Mitigação dupla: *bounce buffer* aumentado de ×10 para ×20
+  (mais SRAM interna a absorver os picos) e relógio de píxeis reduzido de
+  21 MHz para 18 MHz (menos exigência de largura de banda; refresh passa
+  de ~24 para ~21 fps, impercetível nesta interface).
+
 ## v1.1.7 — 2026-07-16
 
 ### Novidades
