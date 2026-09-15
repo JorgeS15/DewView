@@ -98,7 +98,9 @@ void setup()
 #if ESP_PANEL_DRIVERS_BUS_ENABLE_RGB && CONFIG_IDF_TARGET_ESP32S3
     auto lcd_bus = lcd->getBus();
     if (lcd_bus->getBasicAttributes().type == ESP_PANEL_BUS_TYPE_RGB) {
-        static_cast<BusRGB *>(lcd_bus)->configRGB_BounceBufferSize(lcd->getFrameWidth() * 10);
+        /* *20: absorve picos de trafego na PSRAM (WiFi) e evita o screen
+         * drift do painel RGB; manter igual ao BOUNCE_BUF_SIZE da placa */
+        static_cast<BusRGB *>(lcd_bus)->configRGB_BounceBufferSize(lcd->getFrameWidth() * 20);
     }
 #endif
 #endif
